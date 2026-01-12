@@ -5,7 +5,7 @@ services:
     image: wall-demo:0.0.1
     build: .
     ports:
-      - "10002:8080"
+      - "10003:8080"
     environment:
       - PORT=${PORT:-8080}
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-}
