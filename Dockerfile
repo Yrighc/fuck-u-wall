@@ -10,6 +10,16 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# 安装系统依赖（包括字体库，用于生成验证码）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libfreetype6-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    fonts-dejavu-core \
+    fonts-liberation && \
+    rm -rf /var/lib/apt/lists/*
+
 # 复制依赖文件
 COPY requirements.txt .
 

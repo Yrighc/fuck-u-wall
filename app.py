@@ -79,24 +79,53 @@ def generate_captcha():
     image = Image.new('RGB', (width, height), color=(255, 255, 255))
     draw = ImageDraw.Draw(image)
     
-    # 尝试使用系统字体，如果失败则使用默认字体
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 24)
-    except:
+    # 尝试加载字体（支持多种系统）
+    font = None
+    font_paths = [
+        # Linux 常见字体路径
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+        '/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf',
+        '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
+        # macOS 字体路径
+        '/System/Library/Fonts/Helvetica.ttc',
+        '/System/Library/Fonts/Supplemental/Arial.ttf',
+        # Windows 字体路径
+        'C:/Windows/Fonts/arial.ttf',
+        'C:/Windows/Fonts/ARIAL.TTF',
+        # 其他可能路径
+        'arial.ttf',
+        'Arial.ttf',
+    ]
+    
+    for font_path in font_paths:
         try:
-            font = ImageFont.truetype("arial.ttf", 24)
+            font = ImageFont.truetype(font_path, 24)
+            break
         except:
+            continue
+    
+    # 如果所有字体都加载失败，使用默认字体
+    if font is None:
+        try:
+            font = ImageFont.load_default()
+        except:
+            # 如果默认字体也失败，创建一个简单的字体
             font = ImageFont.load_default()
     
-    # 绘制验证码文字（添加一些随机偏移和旋转）
+    # 绘制验证码文字（添加一些随机偏移）
     x = 10
     for char in captcha_text:
-        # 随机颜色
+        # 随机颜色（深色，确保在白色背景上可见）
         color = (random.randint(0, 100), random.randint(0, 100), random.randint(0, 100))
         # 随机y位置
         y = random.randint(5, 15)
         # 绘制文字
-        draw.text((x, y), char, fill=color, font=font)
+        try:
+            draw.text((x, y), char, fill=color, font=font)
+        except:
+            # 如果字体绘制失败，使用默认方式
+            draw.text((x, y), char, fill=color)
         x += 25
     
     # 添加干扰线
@@ -113,8 +142,13 @@ def generate_captcha():
     
     # 将图片转换为字节流
     img_io = io.BytesIO()
-    image.save(img_io, 'PNG')
-    img_io.seek(0)
+    try:
+        image.save(img_io, 'PNG')
+        img_io.seek(0)
+    except Exception as e:
+        # 如果保存失败，记录错误并返回空
+        print(f"保存验证码图片失败: {e}")
+        raise
     
     return img_io
 
@@ -442,8 +476,22 @@ def get_target_domain():
 @app.route('/api/get-captcha', methods=['GET'])
 def get_captcha():
     """获取图片验证码"""
-    img_io = generate_captcha()
-    return Response(img_io.getvalue(), mimetype='image/png')
+    try:
+        img_io = generate_captcha()
+        return Response(img_io.getvalue(), mimetype='image/png')
+    except Exception as e:
+        # 如果生成验证码失败，记录错误并返回错误响应
+        print(f"生成验证码失败: {e}")
+        import traceback
+        traceback.print_exc()
+        # 返回一个简单的错误图片
+        error_image = Image.new('RGB', (120, 40), color=(255, 255, 255))
+        error_draw = ImageDraw.Draw(error_image)
+        error_draw.text((10, 10), "ERROR", fill=(255, 0, 0))
+        error_io = io.BytesIO()
+        error_image.save(error_io, 'PNG')
+        error_io.seek(0)
+        return Response(error_io.getvalue(), mimetype='image/png', status=500)
 
 
 
