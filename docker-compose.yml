@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  wall-demo:
+    image: wall-demo:0.0.1
+    build: .
+    ports:
+      - "10002:8080"
+    environment:
+      - PORT=${PORT:-8080}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-}
+      - TOTP_SECRET=${TOTP_SECRET:-}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID}
+      - SUBDOMAIN=${SUBDOMAIN}
+    restart: unless-stopped
+    # 如果需要使用 .env 文件，取消下面的注释
+    # env_file:
+    #   - .env

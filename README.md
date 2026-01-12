@@ -1,0 +1,240 @@
+# Cloudflare IP 白名单管理工具
+
+一个轻量级的 Web 应用，用于自动将当前 IP 地址添加到 Cloudflare 的防火墙白名单中。
+
+## 功能特性
+
+- 🌐 自动检测当前 IP 地址
+- 🔐 密钥验证保护
+- ☁️ 自动添加到 Cloudflare 白名单
+- 🐳 Docker 容器化部署
+- 💾 占用资源小（Python + Flask + slim 镜像）
+
+## 快速开始
+
+### 1. 获取 Cloudflare 配置信息
+
+#### 步骤 1：获取 API Token（API 令牌）
+
+1. **登录 Cloudflare 控制台**
+   - 访问 [https://dash.cloudflare.com](https://dash.cloudflare.com)
+   - 使用您的账号登录
+
+2. **进入 API 令牌页面**
+   - 点击右上角的头像图标
+   - 在下拉菜单中选择 **"我的个人资料"** 或 **"My Profile"**
+   - 在左侧菜单中找到并点击 **"API 令牌"** 或 **"API Tokens"**
+
+3. **创建自定义令牌**
+   - 点击 **"创建令牌"** 或 **"Create Token"** 按钮
+   - 选择 **"创建自定义令牌"** 或 **"Create Custom Token"**
+
+4. **配置令牌权限**
+   - **令牌名称**：输入一个便于识别的名称，如 "IP白名单管理"
+   - **权限设置**：需要添加以下权限：
+     - **区域（Zone）** > **区域（Zone）** > **读取（Read）**
+     - **区域（Zone）** > **防火墙规则（Firewall Rules）** > **编辑（Edit）**
+   - **区域资源**：选择 **"包括 - 特定区域"**，然后选择您要管理的域名
+
+   > **注意**：Firewall Rules 权限已经包含了创建和管理过滤器（Filters）的权限，无需单独添加。
+
+5. **创建并复制令牌**
+   - 点击 **"继续以显示摘要"** 或 **"Continue to summary"**
+   - 确认权限无误后，点击 **"创建令牌"** 或 **"Create Token"**
+   - **重要**：立即复制生成的 API Token，它只会显示一次！请妥善保存。
+
+#### 步骤 2：获取 Zone ID（区域 ID）
+
+1. **进入域名管理页面**
+   - 在 Cloudflare 控制台首页，点击您要管理的域名
+
+2. **找到 Zone ID**
+   - 进入域名详情页面后，在右侧边栏的 **"API"** 部分
+   - 可以看到 **"区域 ID"** 或 **"Zone ID"**
+   - 点击右侧的复制图标即可复制 Zone ID
+
+   > **提示**：如果右侧边栏没有显示，也可以向下滚动页面，在页面底部找到 Zone ID。
+
+#### 配置信息汇总
+
+完成以上步骤后，您应该获得：
+- ✅ **CLOUDFLARE_API_TOKEN**：刚才创建的 API 令牌
+- ✅ **CLOUDFLARE_ZONE_ID**：域名的区域 ID
+- ✅ **SUBDOMAIN**：子域名（支持多个用逗号分隔，如 api.example.com,admin.example.com，必需）
+
+### 2. 使用 Docker 运行
+
+```bash
+# 构建镜像
+docker build -t wall-demo .
+
+# 运行容器（单个子域名）
+docker run -d \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  -e SECRET_KEY=your-secret-key-here \
+  -e CLOUDFLARE_API_TOKEN=your-api-token \
+  -e CLOUDFLARE_ZONE_ID=your-zone-id \
+  -e SUBDOMAIN=api.example.com \
+  --name wall-demo \
+  wall-demo
+
+# 运行容器（多个子域名，用逗号分隔）
+docker run -d \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  -e SECRET_KEY=your-secret-key-here \
+  -e CLOUDFLARE_API_TOKEN=your-api-token \
+  -e CLOUDFLARE_ZONE_ID=your-zone-id \
+  -e SUBDOMAIN=api.example.com,admin.example.com,dashboard.example.com \
+  --name wall-demo \
+  wall-demo
+```
+
+### 3. 使用 Docker Compose（推荐）
+
+创建 `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  wall-demo:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - SECRET_KEY=your-secret-key-here
+      - CLOUDFLARE_API_TOKEN=your-api-token
+      - CLOUDFLARE_ZONE_ID=your-zone-id
+      - SUBDOMAIN=api.example.com,admin.example.com
+    restart: unless-stopped
+```
+
+运行：
+
+```bash
+# 设置环境变量（或创建 .env 文件）
+export SUBDOMAIN=api.example.com,admin.example.com
+export SECRET_KEY=your-secret-key
+export CLOUDFLARE_API_TOKEN=your-token
+export CLOUDFLARE_ZONE_ID=your-zone-id
+
+docker-compose up -d
+```
+
+### 4. 访问应用
+
+打开浏览器访问 `http://localhost:8080`
+
+## 环境变量说明
+
+| 变量名 | 说明 | 必需 | 默认值 |
+|--------|------|------|--------|
+| 变量名 | 说明 | 必需 | 默认值 |
+|--------|------|------|--------|
+| `PORT` | 服务端口 | 否 | 8080 |
+| `SECRET_KEY` | 自定义密钥 | 是 | - |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token | 是 | - |
+| `CLOUDFLARE_ZONE_ID` | Cloudflare Zone ID | 是 | - |
+| `SUBDOMAIN` | 子域名（支持多个用逗号分隔，如 api.example.com,admin.example.com），必需 | 是 | - |
+
+## 本地开发
+
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 方式1：创建 .env 文件（推荐）
+# 复制 env.example 为 .env 并填写配置
+cp env.example .env
+# 编辑 .env 文件，填入你的配置
+
+# 方式2：使用环境变量
+export SECRET_KEY=your-secret-key
+export CLOUDFLARE_API_TOKEN=your-token
+export CLOUDFLARE_ZONE_ID=your-zone-id
+export SUBDOMAIN=api.example.com,admin.example.com
+
+# 运行
+python app.py
+```
+
+> **提示**：使用 `.env` 文件时，应用会自动读取其中的环境变量，无需手动 export。
+
+## 镜像大小
+
+使用 Python slim 镜像，最终镜像大小约 **120-150MB**。
+
+## 子域名支持
+
+本工具**仅支持子域名级别的白名单**，支持配置多个子域名。
+
+**工作原理**：
+- 支持配置多个子域名，用逗号分隔
+- 点击"添加到白名单"时，会**先删除所有现有的防火墙规则**，然后创建两条合并规则（节省规则数量）：
+  1. **白名单规则**：当前公网IP允许访问所有配置的子域名
+  2. **黑名单规则**：所有其他IP禁止访问所有配置的子域名
+- 无论配置多少个子域名，都只创建2条规则，节省 Cloudflare 规则配额
+- 规则仅应用到配置的子域名，不会影响其他子域名
+
+**示例**：
+- 保护单个子域名：设置 `SUBDOMAIN=api.example.com`
+- 保护多个子域名：设置 `SUBDOMAIN=api.example.com,admin.example.com,dashboard.example.com`
+- 每次添加IP时，会清除所有旧规则，重新创建新规则
+
+## 安全措施
+
+本应用已实现以下安全措施：
+
+1. **验证码保护**：
+   - 在密钥验证时需要使用数学验证码
+   - 验证码每次提交后自动刷新
+   - 防止自动化攻击和暴力破解
+
+2. **安全响应头**：
+   - X-Content-Type-Options: nosniff
+   - X-Frame-Options: DENY
+   - X-XSS-Protection: 1; mode=block
+   - Strict-Transport-Security
+   - Content-Security-Policy
+
+3. **密钥验证**：
+   - 密钥验证结合验证码双重保护
+   - 密钥在传输时使用 HTTPS（建议在生产环境使用 HTTPS）
+
+## 安全建议
+
+1. **使用 HTTPS**：
+   - 生产环境必须使用 HTTPS（通过反向代理如 Nginx 或使用 Cloudflare）
+   - 不要在 HTTP 环境下使用，密钥会明文传输
+
+2. **强密钥**：
+   - 使用足够长且复杂的密钥（建议至少 32 个字符）
+   - 定期更换密钥
+
+3. **网络隔离**：
+   - 建议将应用部署在内网，通过 VPN 或 Cloudflare Tunnel 访问
+   - 不要将应用直接暴露在公网
+
+4. **监控和告警**：
+   - 监控失败尝试日志
+   - 设置异常访问告警
+
+## 注意事项
+
+1. 确保 Cloudflare API Token 有足够的权限（需要 Firewall Rules 编辑权限）
+2. 密钥请妥善保管，不要泄露
+3. **每次点击"添加到白名单"时，会删除所有现有的防火墙规则，然后重新创建**
+4. **会同时创建白名单和黑名单规则**：
+   - 白名单：当前公网IP允许访问
+   - 黑名单：所有其他IP禁止访问
+5. **必须设置 `SUBDOMAIN` 环境变量**，否则应用无法启动
+6. 支持多个子域名，用逗号分隔，如：`api.example.com,admin.example.com`
+7. 请确保所有子域名已经在 Cloudflare 中正确配置
+8. **生产环境必须使用 HTTPS**，否则密钥会明文传输
+
+## 许可证
+
+MIT
