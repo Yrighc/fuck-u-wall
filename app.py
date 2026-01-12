@@ -3,18 +3,12 @@
 
 import os
 import json
-import random
-import string
 import io
-import base64
 import re
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 from flask import Flask, request, jsonify, session, Response
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import pyotp
-import qrcode
 from dotenv import load_dotenv
 import warnings
 
@@ -65,92 +59,6 @@ def set_security_headers(response):
     response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
     return response
 
-def generate_captcha():
-    """生成图片验证码"""
-    # 生成4位随机字符（数字+大写字母）
-    chars = string.digits + string.ascii_uppercase
-    captcha_text = ''.join(random.choices(chars, k=4))
-    
-    # 保存到session
-    session['captcha_answer'] = captcha_text
-    
-    # 创建图片
-    width, height = 120, 40
-    image = Image.new('RGB', (width, height), color=(255, 255, 255))
-    draw = ImageDraw.Draw(image)
-    
-    # 尝试加载字体（支持多种系统）
-    font = None
-    font_paths = [
-        # Linux 常见字体路径
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
-        '/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf',
-        '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
-        # macOS 字体路径
-        '/System/Library/Fonts/Helvetica.ttc',
-        '/System/Library/Fonts/Supplemental/Arial.ttf',
-        # Windows 字体路径
-        'C:/Windows/Fonts/arial.ttf',
-        'C:/Windows/Fonts/ARIAL.TTF',
-        # 其他可能路径
-        'arial.ttf',
-        'Arial.ttf',
-    ]
-    
-    for font_path in font_paths:
-        try:
-            font = ImageFont.truetype(font_path, 24)
-            break
-        except:
-            continue
-    
-    # 如果所有字体都加载失败，使用默认字体
-    if font is None:
-        try:
-            font = ImageFont.load_default()
-        except:
-            # 如果默认字体也失败，创建一个简单的字体
-            font = ImageFont.load_default()
-    
-    # 绘制验证码文字（添加一些随机偏移）
-    x = 10
-    for char in captcha_text:
-        # 随机颜色（深色，确保在白色背景上可见）
-        color = (random.randint(0, 100), random.randint(0, 100), random.randint(0, 100))
-        # 随机y位置
-        y = random.randint(5, 15)
-        # 绘制文字
-        try:
-            draw.text((x, y), char, fill=color, font=font)
-        except:
-            # 如果字体绘制失败，使用默认方式
-            draw.text((x, y), char, fill=color)
-        x += 25
-    
-    # 添加干扰线
-    for _ in range(3):
-        start = (random.randint(0, width), random.randint(0, height))
-        end = (random.randint(0, width), random.randint(0, height))
-        draw.line([start, end], fill=(random.randint(150, 255), random.randint(150, 255), random.randint(150, 255)), width=1)
-    
-    # 添加干扰点
-    for _ in range(50):
-        x = random.randint(0, width)
-        y = random.randint(0, height)
-        draw.point((x, y), fill=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
-    
-    # 将图片转换为字节流
-    img_io = io.BytesIO()
-    try:
-        image.save(img_io, 'PNG')
-        img_io.seek(0)
-    except Exception as e:
-        # 如果保存失败，记录错误并返回空
-        print(f"保存验证码图片失败: {e}")
-        raise
-    
-    return img_io
 
 
 @app.route('/')
@@ -301,16 +209,6 @@ def index():
                 <input type="text" id="totpCode" name="totpCode" placeholder="请输入验证码" required maxlength="6" pattern="[0-9]{6}">
                 <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">请输入密钥</small>
             </div>
-            <div class="form-group">
-                <label for="captcha">验证码</label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="text" id="captcha" name="captcha" placeholder="请输入验证码" required style="flex: 1;" maxlength="4">
-                    <div style="display: flex; gap: 5px; align-items: center;">
-                        <img id="captchaImage" src="/api/get-captcha" alt="验证码" style="border: 1px solid #e0e0e0; border-radius: 6px; cursor: pointer;" onclick="getCaptcha()">
-                        <button type="button" id="refreshCaptcha" style="padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">刷新</button>
-                    </div>
-                </div>
-            </div>
             <button type="submit" id="submitBtn">
                 <span id="btnText">添加到白名单</span>
             </button>
@@ -318,24 +216,10 @@ def index():
         <div class="message" id="message"></div>
     </div>
     <script>
-        // 获取验证码图片
-        function getCaptcha() {
-            const img = document.getElementById('captchaImage');
-            // 添加时间戳防止缓存
-            img.src = '/api/get-captcha?t=' + new Date().getTime();
-            document.getElementById('captcha').value = '';
-        }
-
-        // 刷新验证码
-        document.getElementById('refreshCaptcha').addEventListener('click', () => {
-            getCaptcha();
-        });
-
         // 添加到白名单
         document.getElementById('whitelistForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const totpCode = document.getElementById('totpCode').value;
-            const captcha = document.getElementById('captcha').value;
             const ipInput = document.getElementById('ipInput').value.trim();
             const submitBtn = document.getElementById('submitBtn');
             const btnText = document.getElementById('btnText');
@@ -358,7 +242,6 @@ def index():
             try {
                 const requestBody = {
                     totp_code: totpCode,
-                    captcha: captcha,
                     ips: ipInput.trim()
                 };
 
@@ -377,13 +260,7 @@ def index():
 
                 if (data.success) {
                     document.getElementById('totpCode').value = '';
-                    document.getElementById('captcha').value = '';
                     document.getElementById('ipInput').value = '';
-                    getCaptcha(); // 刷新验证码
-                } else {
-                    // 验证失败时刷新验证码
-                    getCaptcha();
-                    document.getElementById('captcha').value = '';
                 }
             } catch (error) {
                 message.className = 'message error';
@@ -396,8 +273,6 @@ def index():
             }
         });
 
-        // 页面加载时获取验证码
-        getCaptcha();
     </script>
 </body>
 </html>'''
@@ -473,25 +348,6 @@ def get_target_domain():
     return jsonify({'success': True, 'domain': domains, 'domains': CONFIG['subdomains']})
 
 
-@app.route('/api/get-captcha', methods=['GET'])
-def get_captcha():
-    """获取图片验证码"""
-    try:
-        img_io = generate_captcha()
-        return Response(img_io.getvalue(), mimetype='image/png')
-    except Exception as e:
-        # 如果生成验证码失败，记录错误并返回错误响应
-        print(f"生成验证码失败: {e}")
-        import traceback
-        traceback.print_exc()
-        # 返回一个简单的错误图片
-        error_image = Image.new('RGB', (120, 40), color=(255, 255, 255))
-        error_draw = ImageDraw.Draw(error_image)
-        error_draw.text((10, 10), "ERROR", fill=(255, 0, 0))
-        error_io = io.BytesIO()
-        error_image.save(error_io, 'PNG')
-        error_io.seek(0)
-        return Response(error_io.getvalue(), mimetype='image/png', status=500)
 
 
 
@@ -504,7 +360,6 @@ def add_to_whitelist():
             return jsonify({'success': False, 'message': '请求数据无效'}), 400
         
         totp_code = data.get('totp_code', '')
-        captcha_answer = data.get('captcha', '')
         
         if not totp_code:
             return jsonify({'success': False, 'message': '动态验证码不能为空'}), 400
@@ -512,30 +367,8 @@ def add_to_whitelist():
         if len(totp_code) != 6 or not totp_code.isdigit():
             return jsonify({'success': False, 'message': '验证码必须是6位数字'}), 400
         
-        if not captcha_answer:
-            return jsonify({'success': False, 'message': '验证码不能为空'}), 400
-        
-        # 验证验证码
-        correct_answer = session.get('captcha_answer')
-        if not correct_answer:
-            return jsonify({'success': False, 'message': '验证码已过期，请刷新页面'}), 400
-        
-        # 验证码不区分大小写
-        user_answer = captcha_answer.strip().upper()
-        correct_answer = correct_answer.upper()
-        
-        if user_answer != correct_answer:
-            # 验证码错误，生成新的验证码
-            generate_captcha()
-            return jsonify({'success': False, 'message': '验证码错误'}), 400
-        
-        # 验证码正确，清除验证码答案
-        session.pop('captcha_answer', None)
-        
         # 验证TOTP动态验证码（允许前后30秒的时间窗口）
         if not totp.verify(totp_code, valid_window=1):
-            # TOTP验证失败，生成新的验证码
-            generate_captcha()
             return jsonify({'success': False, 'message': '动态验证码错误或已过期，请重新获取'}), 401
 
         # 获取要添加的IP列表（必须手动输入）
