@@ -9,7 +9,7 @@ services:
       # 每次构建时不使用缓存，强制重新构建（如需启用，取消注释）
       # no_cache: true
     ports:
-      - "10003:8080"
+      - "127.0.0.1:10003:8080"
     environment:
       - PORT=${PORT:-8080}
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-}

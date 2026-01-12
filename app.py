@@ -172,24 +172,6 @@ def index():
             text-align: center;
             font-size: 28px;
         }
-        .ip-display {
-            background: #f5f5f5;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-        .ip-label {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-        .ip-value {
-            color: #333;
-            font-size: 24px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-        }
         .form-group {
             margin-bottom: 20px;
         }
@@ -274,24 +256,11 @@ def index():
 <body>
     <div class="container">
         <h1>🌐 IP 白名单管理</h1>
-        <div class="ip-display">
-            <div class="ip-label">当前 IP 地址（自动获取）</div>
-            <div class="ip-value" id="currentIP">获取中...</div>
-            <div id="ipv4Display" style="margin-top: 10px; font-size: 14px; color: #333; display: none;">
-                <strong>IPv4:</strong> <span id="ipv4Value" style="font-family: 'Courier New', monospace;"></span>
-            </div>
-            <div id="ipv6Display" style="margin-top: 10px; font-size: 14px; color: #333; display: none;">
-                <strong>IPv6:</strong> <span id="ipv6Value" style="font-family: 'Courier New', monospace; word-break: break-all;"></span>
-            </div>
-            <div id="ipError" style="margin-top: 10px; font-size: 12px; color: #dc3545; display: none;">
-                自动获取失败，请手动输入IP地址
-            </div>
-        </div>
         <form id="whitelistForm">
             <div class="form-group">
-                <label for="ipInput">IP 地址（可选，留空使用自动获取的IP，支持多个用逗号分隔）</label>
-                <input type="text" id="ipInput" name="ipInput" placeholder="例如: 192.168.1.1,10.0.0.1">
-                <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">留空则使用自动获取的IP，或手动输入IP（支持多个，用逗号分隔）</small>
+                <label for="ipInput">IP 地址（支持多个用逗号分隔）</label>
+                <input type="text" id="ipInput" name="ipInput" placeholder="例如: 192.168.1.1,10.0.0.1" required>
+                <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">请输入要添加到白名单的IP地址，支持多个IP用逗号分隔（支持IPv4和IPv6）</small>
             </div>
             <div class="form-group">
                 <label for="totpCode">动态验证码</label>
@@ -315,73 +284,6 @@ def index():
         <div class="message" id="message"></div>
     </div>
     <script>
-        // 获取当前 IP
-        async function getCurrentIP() {
-            try {
-                const response = await fetch('/api/get-ip');
-                const data = await response.json();
-                if (data.success) {
-                    document.getElementById('ipError').style.display = 'none';
-                    
-                    // 分离 IPv4 和 IPv6
-                    const ipv4List = [];
-                    const ipv6List = [];
-                    
-                    if (data.ips && data.ips.length > 0) {
-                        data.ips.forEach(ip => {
-                            if (ip.includes('.')) {
-                                // IPv4
-                                if (!ipv4List.includes(ip)) {
-                                    ipv4List.push(ip);
-                                }
-                            } else if (ip.includes(':')) {
-                                // IPv6
-                                if (!ipv6List.includes(ip)) {
-                                    ipv6List.push(ip);
-                                }
-                            }
-                        });
-                    }
-                    
-                    // 显示主IP（优先IPv4）
-                    if (ipv4List.length > 0) {
-                        document.getElementById('currentIP').textContent = ipv4List[0];
-                    } else if (ipv6List.length > 0) {
-                        document.getElementById('currentIP').textContent = ipv6List[0];
-                    } else if (data.ip) {
-                        document.getElementById('currentIP').textContent = data.ip;
-                    }
-                    
-                    // 显示 IPv4
-                    if (ipv4List.length > 0) {
-                        document.getElementById('ipv4Value').textContent = ipv4List.join(', ');
-                        document.getElementById('ipv4Display').style.display = 'block';
-                    } else {
-                        document.getElementById('ipv4Display').style.display = 'none';
-                    }
-                    
-                    // 显示 IPv6
-                    if (ipv6List.length > 0) {
-                        document.getElementById('ipv6Value').textContent = ipv6List.join(', ');
-                        document.getElementById('ipv6Display').style.display = 'block';
-                    } else {
-                        document.getElementById('ipv6Display').style.display = 'none';
-                    }
-                } else {
-                    document.getElementById('currentIP').textContent = '获取失败';
-                    document.getElementById('ipv4Display').style.display = 'none';
-                    document.getElementById('ipv6Display').style.display = 'none';
-                    document.getElementById('ipError').style.display = 'block';
-                }
-            } catch (error) {
-                document.getElementById('currentIP').textContent = '获取失败';
-                document.getElementById('ipv4Display').style.display = 'none';
-                document.getElementById('ipv6Display').style.display = 'none';
-                document.getElementById('ipError').style.display = 'block';
-                console.error('获取 IP 失败:', error);
-            }
-        }
-
         // 获取验证码图片
         function getCaptcha() {
             const img = document.getElementById('captchaImage');
@@ -409,16 +311,22 @@ def index():
             submitBtn.disabled = true;
             btnText.innerHTML = '<span class="loading"></span>处理中...';
 
+            // 验证IP输入
+            if (!ipInput || !ipInput.trim()) {
+                message.className = 'message error';
+                message.textContent = '请输入IP地址';
+                message.style.display = 'block';
+                submitBtn.disabled = false;
+                btnText.textContent = '添加到白名单';
+                return;
+            }
+
             try {
                 const requestBody = {
                     totp_code: totpCode,
-                    captcha: captcha
+                    captcha: captcha,
+                    ips: ipInput.trim()
                 };
-                
-                // 如果手动输入了IP，则使用手动输入的IP
-                if (ipInput) {
-                    requestBody.ips = ipInput;
-                }
 
                 const response = await fetch('/api/add-to-whitelist', {
                     method: 'POST',
@@ -456,9 +364,6 @@ def index():
 
         // 页面加载时获取验证码
         getCaptcha();
-
-        // 页面加载时获取 IP
-        getCurrentIP();
     </script>
 </body>
 </html>'''
@@ -541,197 +446,6 @@ def get_captcha():
     return Response(img_io.getvalue(), mimetype='image/png')
 
 
-def get_client_ips(request):
-    """从请求头获取客户端真实IP（支持IPv4和IPv6）"""
-    ips = []
-    
-    # 按优先级检查各种请求头
-    headers_to_check = [
-        'CF-Connecting-IP',  # Cloudflare
-        'X-Forwarded-For',
-        'X-Real-IP',
-        'X-Client-IP',
-        'X-Forwarded',
-        'Forwarded-For',
-        'Forwarded',
-    ]
-    
-    for header in headers_to_check:
-        value = request.headers.get(header, '')
-        if value:
-            # X-Forwarded-For 可能包含多个IP，用逗号分隔
-            for ip in value.split(','):
-                ip = ip.strip()
-                # 跳过本地IP
-                if ip in ['127.0.0.1', '::1', 'localhost']:
-                    continue
-                # 验证IP格式（简单验证）
-                if ip and (len(ip.split('.')) == 4 or (':' in ip and ip.count(':') >= 2)):
-                    if ip not in ips:
-                        ips.append(ip)
-    
-    # 如果请求头中没有，尝试从 remote_addr 获取
-    if not ips:
-        remote_addr = request.remote_addr
-        if remote_addr and remote_addr not in ['127.0.0.1', '::1', 'localhost']:
-            if remote_addr not in ips:
-                ips.append(remote_addr)
-    
-    return ips
-
-
-@app.route('/api/get-ip', methods=['GET'])
-def get_current_ip():
-    """获取客户端（访问者）的 IP 地址"""
-    all_ips = []
-    
-    # 优先从请求头获取客户端IP（访问者的真实IP）
-    client_ip = None
-    try:
-        # 优先使用 Cloudflare 的 IP 头（如果通过 Cloudflare 代理）
-        client_ip = request.headers.get('CF-Connecting-IP')
-        if not client_ip:
-            # 使用 X-Forwarded-For（取第一个，可能是代理链）
-            forwarded = request.headers.get('X-Forwarded-For', '')
-            if forwarded:
-                client_ip = forwarded.split(',')[0].strip()
-        if not client_ip:
-            # 使用 X-Real-IP（Nginx 等反向代理）
-            client_ip = request.headers.get('X-Real-IP')
-        if not client_ip:
-            # 使用 X-Forwarded-For 的其他变体
-            client_ip = request.headers.get('X-Forwarded')
-        if not client_ip:
-            # 最后使用 Flask 的 remote_addr（直接连接时的客户端IP）
-            client_ip = request.remote_addr
-        
-        # 验证客户端IP格式
-        if client_ip:
-            # 排除本地IP和私有IP
-            if client_ip not in ['127.0.0.1', '::1', 'localhost']:
-                # IPv4 验证
-                parts = client_ip.split('.')
-                if len(parts) == 4:
-                    try:
-                        if all(0 <= int(p) <= 255 for p in parts):
-                            # 排除私有IP段
-                            first_octet = int(parts[0])
-                            if not (first_octet == 10 or 
-                                   (first_octet == 172 and 16 <= int(parts[1]) <= 31) or
-                                   (first_octet == 192 and int(parts[1]) == 168)):
-                                if client_ip not in all_ips:
-                                    all_ips.append(client_ip)
-                    except:
-                        pass
-                # IPv6 验证
-                elif ':' in client_ip and client_ip.count(':') >= 2:
-                    # 排除本地IPv6
-                    if not client_ip.startswith('::1') and not client_ip.startswith('fe80:'):
-                        if client_ip not in all_ips:
-                            all_ips.append(client_ip)
-    except Exception as e:
-        print(f"获取客户端IP时出错: {e}")
-        pass
-    
-    # 如果从请求头获取到了IP，直接返回
-    if all_ips:
-        # 分离IPv4和IPv6
-        ipv4 = [ip for ip in all_ips if '.' in ip]
-        ipv6 = [ip for ip in all_ips if ':' in ip]
-        
-        # 主IP优先使用IPv4，如果没有则使用IPv6
-        main_ip = ipv4[0] if ipv4 else (ipv6[0] if ipv6 else all_ips[0])
-        
-        return jsonify({
-            'success': True, 
-            'ip': main_ip, 
-            'ips': all_ips,
-            'ipv4': ipv4,
-            'ipv6': ipv6
-        })
-    
-    # 如果从请求头获取失败，尝试从第三方API获取（作为备用）
-    # 注意：这会获取服务器的公网IP，不是客户端的IP
-    # 同时获取 IPv4 和 IPv6
-    ip_services = [
-        ('https://api.ipify.org?format=json', 'ip'),      # IPv4
-        ('https://api64.ipify.org?format=json', 'ip'),   # IPv6
-    ]
-    
-    # 分别获取 IPv4 和 IPv6，不提前break
-    for service, json_key in ip_services:
-        try:
-            response = requests.get(service, timeout=5, verify=True)
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    ip = data.get(json_key, '').strip()
-                    
-                    # 验证 IP 格式
-                    if ip and ip not in ['127.0.0.1', '::1', 'localhost', '']:
-                        # IPv4 验证：4个数字段，每个在0-255之间
-                        parts = ip.split('.')
-                        if len(parts) == 4:
-                            try:
-                                if all(0 <= int(p) <= 255 for p in parts):
-                                    if ip not in all_ips:
-                                        all_ips.append(ip)
-                            except:
-                                continue
-                        # IPv6 验证：包含冒号且至少2个
-                        elif ':' in ip and ip.count(':') >= 2:
-                            if ip not in all_ips:
-                                all_ips.append(ip)
-                except:
-                    continue
-        except requests.exceptions.SSLError:
-            # SSL错误时，尝试不验证证书
-            try:
-                response = requests.get(service, timeout=5, verify=False)
-                if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        ip = data.get(json_key, '').strip()
-                        
-                        if ip and ip not in ['127.0.0.1', '::1', 'localhost', '']:
-                            parts = ip.split('.')
-                            if len(parts) == 4:
-                                try:
-                                    if all(0 <= int(p) <= 255 for p in parts):
-                                        if ip not in all_ips:
-                                            all_ips.append(ip)
-                                except:
-                                    continue
-                            elif ':' in ip and ip.count(':') >= 2:
-                                if ip not in all_ips:
-                                    all_ips.append(ip)
-                    except:
-                        continue
-            except:
-                continue
-        except:
-            continue
-    
-    # 如果获取到了IP
-    if all_ips:
-        # 分离IPv4和IPv6
-        ipv4 = [ip for ip in all_ips if '.' in ip]
-        ipv6 = [ip for ip in all_ips if ':' in ip]
-        
-        # 主IP优先使用IPv4，如果没有则使用IPv6
-        main_ip = ipv4[0] if ipv4 else (ipv6[0] if ipv6 else all_ips[0])
-        
-        return jsonify({
-            'success': True, 
-            'ip': main_ip, 
-            'ips': all_ips,
-            'ipv4': ipv4,
-            'ipv6': ipv6
-        })
-    
-    # 如果都失败了，返回提示
-    return jsonify({'success': False, 'message': '无法自动获取 IP 地址，请手动输入IP'})
-
 
 @app.route('/api/add-to-whitelist', methods=['POST'])
 def add_to_whitelist():
@@ -776,59 +490,36 @@ def add_to_whitelist():
             generate_captcha()
             return jsonify({'success': False, 'message': '动态验证码错误或已过期，请重新获取'}), 401
 
-        # 获取要添加的IP列表
+        # 获取要添加的IP列表（必须手动输入）
         ips_input = data.get('ips', '').strip()
-        ip_list = []
         
-        if ips_input:
-            # 使用手动输入的IP
-            ip_list = [ip.strip() for ip in ips_input.split(',') if ip.strip()]
-            # 验证IP格式
-            for ip in ip_list:
-                if not (len(ip.split('.')) == 4 or ':' in ip):
-                    return jsonify({'success': False, 'message': f'IP 格式错误: {ip}'}), 400
-        else:
-            # 使用第三方服务获取服务器自己的公网IP
-            ip_services = [
-                ('https://api.ipify.org?format=json', 'ip'),  # IPv4
-                ('https://api64.ipify.org?format=json', 'ip'),  # IPv6优先
-                ('https://ifconfig.me/ip', None),  # 文本
-                ('https://icanhazip.com', None),  # 文本
-                ('https://ipinfo.io/ip', None),  # 文本
-                ('https://checkip.amazonaws.com', None),  # 文本
-                ('https://api.myip.com', 'ip'),  # JSON
-                ('https://ip.seeip.org', None),  # 文本
-                ('https://api.ip.sb/ip', None),  # 文本
-            ]
-            
-            ip_list = []
-            for service, json_key in ip_services:
-                try:
-                    ip_response = requests.get(service, timeout=10, verify=True)
-                    if ip_response.status_code == 200:
-                        ip = None
-                        try:
-                            if json_key:
-                                ip_data = ip_response.json()
-                                ip = ip_data.get(json_key, '').strip()
-                            else:
-                                ip = ip_response.text.strip()
-                        except:
-                            continue
-                        
-                        # 验证 IP 格式
-                        if ip and ip not in ['127.0.0.1', '::1', 'localhost']:
-                            if len(ip.split('.')) == 4 or (':' in ip and ip.count(':') >= 2):
-                                if ip not in ip_list:
-                                    ip_list.append(ip)
-                except:
-                    continue
-            
-            if not ip_list:
-                return jsonify({'success': False, 'message': '无法获取 IP 地址，请检查网络连接或手动输入IP'}), 400
+        if not ips_input:
+            return jsonify({'success': False, 'message': '请输入IP地址'}), 400
+        
+        # 解析IP列表
+        ip_list = [ip.strip() for ip in ips_input.split(',') if ip.strip()]
         
         if not ip_list:
             return jsonify({'success': False, 'message': '没有有效的IP地址'}), 400
+        
+        # 验证IP格式
+        for ip in ip_list:
+            # IPv4 验证：4个数字段
+            parts = ip.split('.')
+            if len(parts) == 4:
+                try:
+                    # 验证每个段是否在0-255之间
+                    if not all(0 <= int(p) <= 255 for p in parts):
+                        return jsonify({'success': False, 'message': f'IP 格式错误: {ip}'}), 400
+                except ValueError:
+                    return jsonify({'success': False, 'message': f'IP 格式错误: {ip}'}), 400
+            # IPv6 验证：包含冒号且至少2个
+            elif ':' in ip and ip.count(':') >= 2:
+                # 基本IPv6格式验证
+                if not re.match(r'^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$', ip):
+                    return jsonify({'success': False, 'message': f'IPv6 格式错误: {ip}'}), 400
+            else:
+                return jsonify({'success': False, 'message': f'IP 格式错误: {ip}'}), 400
 
         # 调用 Cloudflare API 添加IP列表
         success, message = add_ips_to_cloudflare(ip_list)
