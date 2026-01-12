@@ -277,7 +277,12 @@ def index():
         <div class="ip-display">
             <div class="ip-label">当前 IP 地址（自动获取）</div>
             <div class="ip-value" id="currentIP">获取中...</div>
-            <div id="allIPs" style="margin-top: 10px; font-size: 12px; color: #666; display: none; word-break: break-all;"></div>
+            <div id="ipv4Display" style="margin-top: 10px; font-size: 14px; color: #333; display: none;">
+                <strong>IPv4:</strong> <span id="ipv4Value" style="font-family: 'Courier New', monospace;"></span>
+            </div>
+            <div id="ipv6Display" style="margin-top: 10px; font-size: 14px; color: #333; display: none;">
+                <strong>IPv6:</strong> <span id="ipv6Value" style="font-family: 'Courier New', monospace; word-break: break-all;"></span>
+            </div>
             <div id="ipError" style="margin-top: 10px; font-size: 12px; color: #dc3545; display: none;">
                 自动获取失败，请手动输入IP地址
             </div>
@@ -316,24 +321,62 @@ def index():
                 const response = await fetch('/api/get-ip');
                 const data = await response.json();
                 if (data.success) {
-                    document.getElementById('currentIP').textContent = data.ip;
                     document.getElementById('ipError').style.display = 'none';
-                    // 如果有多个IP，显示所有IP
-                    if (data.ips && data.ips.length > 1) {
-                        const allIPsDiv = document.getElementById('allIPs');
-                        allIPsDiv.textContent = '所有IP: ' + data.ips.join(', ');
-                        allIPsDiv.style.display = 'block';
+                    
+                    // 分离 IPv4 和 IPv6
+                    const ipv4List = [];
+                    const ipv6List = [];
+                    
+                    if (data.ips && data.ips.length > 0) {
+                        data.ips.forEach(ip => {
+                            if (ip.includes('.')) {
+                                // IPv4
+                                if (!ipv4List.includes(ip)) {
+                                    ipv4List.push(ip);
+                                }
+                            } else if (ip.includes(':')) {
+                                // IPv6
+                                if (!ipv6List.includes(ip)) {
+                                    ipv6List.push(ip);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // 显示主IP（优先IPv4）
+                    if (ipv4List.length > 0) {
+                        document.getElementById('currentIP').textContent = ipv4List[0];
+                    } else if (ipv6List.length > 0) {
+                        document.getElementById('currentIP').textContent = ipv6List[0];
+                    } else if (data.ip) {
+                        document.getElementById('currentIP').textContent = data.ip;
+                    }
+                    
+                    // 显示 IPv4
+                    if (ipv4List.length > 0) {
+                        document.getElementById('ipv4Value').textContent = ipv4List.join(', ');
+                        document.getElementById('ipv4Display').style.display = 'block';
                     } else {
-                        document.getElementById('allIPs').style.display = 'none';
+                        document.getElementById('ipv4Display').style.display = 'none';
+                    }
+                    
+                    // 显示 IPv6
+                    if (ipv6List.length > 0) {
+                        document.getElementById('ipv6Value').textContent = ipv6List.join(', ');
+                        document.getElementById('ipv6Display').style.display = 'block';
+                    } else {
+                        document.getElementById('ipv6Display').style.display = 'none';
                     }
                 } else {
                     document.getElementById('currentIP').textContent = '获取失败';
-                    document.getElementById('allIPs').style.display = 'none';
+                    document.getElementById('ipv4Display').style.display = 'none';
+                    document.getElementById('ipv6Display').style.display = 'none';
                     document.getElementById('ipError').style.display = 'block';
                 }
             } catch (error) {
                 document.getElementById('currentIP').textContent = '获取失败';
-                document.getElementById('allIPs').style.display = 'none';
+                document.getElementById('ipv4Display').style.display = 'none';
+                document.getElementById('ipv6Display').style.display = 'none';
                 document.getElementById('ipError').style.display = 'block';
                 console.error('获取 IP 失败:', error);
             }
@@ -592,24 +635,30 @@ def get_current_ip():
     
     # 如果从请求头获取到了IP，直接返回
     if all_ips:
-        # 优先返回IPv4，如果没有则返回IPv6
+        # 分离IPv4和IPv6
         ipv4 = [ip for ip in all_ips if '.' in ip]
         ipv6 = [ip for ip in all_ips if ':' in ip]
         
-        if ipv4:
-            return jsonify({'success': True, 'ip': ipv4[0], 'ips': all_ips})
-        elif ipv6:
-            return jsonify({'success': True, 'ip': ipv6[0], 'ips': all_ips})
-        else:
-            return jsonify({'success': True, 'ip': all_ips[0], 'ips': all_ips})
+        # 主IP优先使用IPv4，如果没有则使用IPv6
+        main_ip = ipv4[0] if ipv4 else (ipv6[0] if ipv6 else all_ips[0])
+        
+        return jsonify({
+            'success': True, 
+            'ip': main_ip, 
+            'ips': all_ips,
+            'ipv4': ipv4,
+            'ipv6': ipv6
+        })
     
     # 如果从请求头获取失败，尝试从第三方API获取（作为备用）
     # 注意：这会获取服务器的公网IP，不是客户端的IP
+    # 同时获取 IPv4 和 IPv6
     ip_services = [
         ('https://api.ipify.org?format=json', 'ip'),      # IPv4
         ('https://api64.ipify.org?format=json', 'ip'),   # IPv6
     ]
     
+    # 分别获取 IPv4 和 IPv6，不提前break
     for service, json_key in ip_services:
         try:
             response = requests.get(service, timeout=5, verify=True)
@@ -627,14 +676,12 @@ def get_current_ip():
                                 if all(0 <= int(p) <= 255 for p in parts):
                                     if ip not in all_ips:
                                         all_ips.append(ip)
-                                        break  # 获取到一个就够了
                             except:
                                 continue
                         # IPv6 验证：包含冒号且至少2个
                         elif ':' in ip and ip.count(':') >= 2:
                             if ip not in all_ips:
                                 all_ips.append(ip)
-                                break  # 获取到一个就够了
                 except:
                     continue
         except requests.exceptions.SSLError:
@@ -653,13 +700,11 @@ def get_current_ip():
                                     if all(0 <= int(p) <= 255 for p in parts):
                                         if ip not in all_ips:
                                             all_ips.append(ip)
-                                            break
                                 except:
                                     continue
                             elif ':' in ip and ip.count(':') >= 2:
                                 if ip not in all_ips:
                                     all_ips.append(ip)
-                                    break
                     except:
                         continue
             except:
@@ -669,16 +714,20 @@ def get_current_ip():
     
     # 如果获取到了IP
     if all_ips:
-        # 优先返回IPv4，如果没有则返回IPv6
+        # 分离IPv4和IPv6
         ipv4 = [ip for ip in all_ips if '.' in ip]
         ipv6 = [ip for ip in all_ips if ':' in ip]
         
-        if ipv4:
-            return jsonify({'success': True, 'ip': ipv4[0], 'ips': all_ips})
-        elif ipv6:
-            return jsonify({'success': True, 'ip': ipv6[0], 'ips': all_ips})
-        else:
-            return jsonify({'success': True, 'ip': all_ips[0], 'ips': all_ips})
+        # 主IP优先使用IPv4，如果没有则使用IPv6
+        main_ip = ipv4[0] if ipv4 else (ipv6[0] if ipv6 else all_ips[0])
+        
+        return jsonify({
+            'success': True, 
+            'ip': main_ip, 
+            'ips': all_ips,
+            'ipv4': ipv4,
+            'ipv6': ipv6
+        })
     
     # 如果都失败了，返回提示
     return jsonify({'success': False, 'message': '无法自动获取 IP 地址，请手动输入IP'})
