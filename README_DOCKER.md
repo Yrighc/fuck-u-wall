@@ -1,0 +1,160 @@
+# Docker 部署说明
+
+## 环境变量配置
+
+应用需要以下环境变量：
+
+| 变量名 | 说明 | 必需 | 默认值 |
+|--------|------|------|--------|
+| `PORT` | 服务端口 | 否 | 8080 |
+| `FLASK_SECRET_KEY` | Flask Session 密钥 | 否 | 自动生成 |
+| `TOTP_SECRET` | TOTP 动态验证码密钥 | 否 | 自动生成（首次运行会打印） |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token | **是** | - |
+| `CLOUDFLARE_ZONE_ID` | Cloudflare Zone ID | **是** | - |
+| `SUBDOMAIN` | 子域名（多个用逗号分隔） | **是** | - |
+
+## 使用方式
+
+### 方式1：使用启动脚本（推荐，自动删除镜像并重新构建）
+
+**Linux/Mac:**
+```bash
+./start.sh
+```
+
+**Windows:**
+```cmd
+start.bat
+```
+
+启动脚本会自动：
+1. 停止并删除容器
+2. 删除旧镜像
+3. 重新构建镜像
+4. 启动服务
+
+### 方式2：手动使用 docker-compose
+
+1. **创建 `.env` 文件**（可选，但推荐）：
+   ```bash
+   PORT=8080
+   FLASK_SECRET_KEY=your-flask-secret-key-here
+   TOTP_SECRET=your-totp-secret-here
+   CLOUDFLARE_API_TOKEN=your-cloudflare-api-token
+   CLOUDFLARE_ZONE_ID=your-zone-id
+   SUBDOMAIN=api.example.com,admin.example.com
+   ```
+
+2. **删除旧镜像并重新构建启动**：
+   ```bash
+   # 停止并删除容器
+   docker-compose down
+   
+   # 删除镜像（可选）
+   docker rmi wall-demo:0.0.1
+   
+   # 重新构建并启动
+   docker-compose up --build -d
+   ```
+
+3. **或者直接重新构建启动**（不删除镜像）：
+   ```bash
+   docker-compose up --build -d
+   ```
+
+4. **查看日志**：
+   ```bash
+   docker-compose logs -f
+   ```
+
+5. **停止服务**：
+   ```bash
+   docker-compose down
+   ```
+
+### 方式2：直接使用 Dockerfile
+
+1. **构建镜像**：
+   ```bash
+   docker build -t wall-demo:0.0.1 .
+   ```
+
+2. **运行容器**：
+   ```bash
+   docker run -d \
+     --name wall-demo \
+     -p 10002:8080 \
+     -e PORT=8080 \
+     -e FLASK_SECRET_KEY=your-flask-secret-key \
+     -e TOTP_SECRET=your-totp-secret \
+     -e CLOUDFLARE_API_TOKEN=your-token \
+     -e CLOUDFLARE_ZONE_ID=your-zone-id \
+     -e SUBDOMAIN=api.example.com,admin.example.com \
+     wall-demo:0.0.1
+   ```
+
+3. **或者使用 .env 文件**：
+   ```bash
+   docker run -d \
+     --name wall-demo \
+     -p 10002:8080 \
+     --env-file .env \
+     wall-demo:0.0.1
+   ```
+
+## 环境变量生效说明
+
+### docker-compose.yml
+
+- ✅ **环境变量会生效**
+- 环境变量可以通过以下方式传递：
+  1. **直接在 docker-compose.yml 中设置**（已配置）
+  2. **使用 `.env` 文件**（需要取消注释 `env_file` 部分）
+  3. **从系统环境变量读取**（`${VARIABLE_NAME}` 语法）
+
+### Dockerfile
+
+- ✅ **环境变量会生效**
+- 运行时通过 `-e` 参数或 `--env-file` 传递的环境变量会生效
+- Dockerfile 中设置的环境变量（`ENV`）也会生效
+
+## 注意事项
+
+1. **必需的环境变量**：
+   - `CLOUDFLARE_API_TOKEN`：必须设置，否则应用启动会失败
+   - `CLOUDFLARE_ZONE_ID`：必须设置，否则应用启动会失败
+   - `SUBDOMAIN`：必须设置，否则应用启动会失败
+
+2. **可选的环境变量**：
+   - `FLASK_SECRET_KEY`：如果不设置，每次重启会生成新的，导致 session 失效
+   - `TOTP_SECRET`：如果不设置，首次运行会生成并打印，需要保存到环境变量中
+
+3. **TOTP_SECRET 首次运行**：
+   - 如果未设置 `TOTP_SECRET`，应用首次运行时会自动生成
+   - 查看日志获取生成的密钥：`docker-compose logs | grep TOTP_SECRET`
+   - 将密钥添加到环境变量中，重启容器
+
+4. **端口映射**：
+   - docker-compose.yml 中映射的是 `10002:8080`
+   - 访问地址：`http://localhost:10002`
+   - 如需修改，编辑 `docker-compose.yml` 中的 `ports` 部分
+
+## 验证环境变量是否生效
+
+启动容器后，查看日志：
+
+```bash
+docker-compose logs wall-demo
+```
+
+如果看到以下错误，说明环境变量未正确设置：
+- `ValueError: 请设置 CLOUDFLARE_API_TOKEN 和 CLOUDFLARE_ZONE_ID 环境变量`
+- `ValueError: 请设置 SUBDOMAIN 环境变量`
+
+## 使用 .env 文件（推荐）
+
+1. 在项目根目录创建 `.env` 文件
+2. 取消 `docker-compose.yml` 中的 `env_file` 注释
+3. 启动服务：`docker-compose up -d`
+
+这样更安全，不会在命令行中暴露敏感信息。

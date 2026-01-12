@@ -539,50 +539,77 @@ def get_client_ips(request):
 
 @app.route('/api/get-ip', methods=['GET'])
 def get_current_ip():
-    """获取服务器公网 IP 地址（使用 ipify API）"""
+    """获取客户端（访问者）的 IP 地址"""
     all_ips = []
     
-    # 只使用两个 API：一个 IPv4，一个 IPv6
-    ip_services = [
-        ('https://api.ipify.org?format=json', 'ip'),      # IPv4
-        ('https://api64.ipify.org?format=json', 'ip'),   # IPv6
-    ]
-
-    # 尝试从请求头获取客户端IP（如果通过代理）
+    # 优先从请求头获取客户端IP（访问者的真实IP）
     client_ip = None
     try:
-        # 优先使用 Cloudflare 的 IP 头
+        # 优先使用 Cloudflare 的 IP 头（如果通过 Cloudflare 代理）
         client_ip = request.headers.get('CF-Connecting-IP')
         if not client_ip:
-            # 使用 X-Forwarded-For（取第一个）
+            # 使用 X-Forwarded-For（取第一个，可能是代理链）
             forwarded = request.headers.get('X-Forwarded-For', '')
             if forwarded:
                 client_ip = forwarded.split(',')[0].strip()
         if not client_ip:
-            # 使用 X-Real-IP
+            # 使用 X-Real-IP（Nginx 等反向代理）
             client_ip = request.headers.get('X-Real-IP')
+        if not client_ip:
+            # 使用 X-Forwarded-For 的其他变体
+            client_ip = request.headers.get('X-Forwarded')
+        if not client_ip:
+            # 最后使用 Flask 的 remote_addr（直接连接时的客户端IP）
+            client_ip = request.remote_addr
         
         # 验证客户端IP格式
         if client_ip:
-            # 排除本地IP
+            # 排除本地IP和私有IP
             if client_ip not in ['127.0.0.1', '::1', 'localhost']:
                 # IPv4 验证
                 parts = client_ip.split('.')
                 if len(parts) == 4:
                     try:
                         if all(0 <= int(p) <= 255 for p in parts):
-                            if client_ip not in all_ips:
-                                all_ips.append(client_ip)
+                            # 排除私有IP段
+                            first_octet = int(parts[0])
+                            if not (first_octet == 10 or 
+                                   (first_octet == 172 and 16 <= int(parts[1]) <= 31) or
+                                   (first_octet == 192 and int(parts[1]) == 168)):
+                                if client_ip not in all_ips:
+                                    all_ips.append(client_ip)
                     except:
                         pass
                 # IPv6 验证
                 elif ':' in client_ip and client_ip.count(':') >= 2:
-                    if client_ip not in all_ips:
-                        all_ips.append(client_ip)
-    except:
+                    # 排除本地IPv6
+                    if not client_ip.startswith('::1') and not client_ip.startswith('fe80:'):
+                        if client_ip not in all_ips:
+                            all_ips.append(client_ip)
+    except Exception as e:
+        print(f"获取客户端IP时出错: {e}")
         pass
-
-    # 从 ipify API 获取 IP
+    
+    # 如果从请求头获取到了IP，直接返回
+    if all_ips:
+        # 优先返回IPv4，如果没有则返回IPv6
+        ipv4 = [ip for ip in all_ips if '.' in ip]
+        ipv6 = [ip for ip in all_ips if ':' in ip]
+        
+        if ipv4:
+            return jsonify({'success': True, 'ip': ipv4[0], 'ips': all_ips})
+        elif ipv6:
+            return jsonify({'success': True, 'ip': ipv6[0], 'ips': all_ips})
+        else:
+            return jsonify({'success': True, 'ip': all_ips[0], 'ips': all_ips})
+    
+    # 如果从请求头获取失败，尝试从第三方API获取（作为备用）
+    # 注意：这会获取服务器的公网IP，不是客户端的IP
+    ip_services = [
+        ('https://api.ipify.org?format=json', 'ip'),      # IPv4
+        ('https://api64.ipify.org?format=json', 'ip'),   # IPv6
+    ]
+    
     for service, json_key in ip_services:
         try:
             response = requests.get(service, timeout=5, verify=True)
@@ -600,12 +627,14 @@ def get_current_ip():
                                 if all(0 <= int(p) <= 255 for p in parts):
                                     if ip not in all_ips:
                                         all_ips.append(ip)
+                                        break  # 获取到一个就够了
                             except:
                                 continue
                         # IPv6 验证：包含冒号且至少2个
                         elif ':' in ip and ip.count(':') >= 2:
                             if ip not in all_ips:
                                 all_ips.append(ip)
+                                break  # 获取到一个就够了
                 except:
                     continue
         except requests.exceptions.SSLError:
@@ -624,20 +653,18 @@ def get_current_ip():
                                     if all(0 <= int(p) <= 255 for p in parts):
                                         if ip not in all_ips:
                                             all_ips.append(ip)
+                                            break
                                 except:
                                     continue
                             elif ':' in ip and ip.count(':') >= 2:
                                 if ip not in all_ips:
                                     all_ips.append(ip)
+                                    break
                     except:
                         continue
             except:
                 continue
-        except requests.exceptions.ConnectionError:
-            continue
-        except requests.exceptions.Timeout:
-            continue
-        except Exception:
+        except:
             continue
     
     # 如果获取到了IP
