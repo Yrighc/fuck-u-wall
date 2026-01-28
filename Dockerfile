@@ -28,6 +28,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用代码
 COPY app.py .
+COPY ip_parser.py .
 
 # 暴露端口
 EXPOSE 8080
