@@ -12,6 +12,8 @@ import pyotp
 from dotenv import load_dotenv
 import warnings
 
+from ip_parser import parse_ips_from_user_input
+
 # 禁用 SSL 警告（仅在必要时）
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
@@ -72,7 +74,7 @@ def index():
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#667eea">
-    <title>IP 白名单管理</title>
+    <title>Demo</title>
     <link rel="manifest" href="/manifest.json">
     <style>
         * {
@@ -197,26 +199,24 @@ def index():
 </head>
 <body>
     <div class="container">
-        <h1>🌐 IP 白名单管理</h1>
+        <h1>Demo</h1>
         <form id="whitelistForm">
             <div class="form-group">
-                <label for="ipInput">IP 地址（支持多个用逗号分隔）</label>
-                <input type="text" id="ipInput" name="ipInput" placeholder="例如: 192.168.1.1,10.0.0.1" required>
-                <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">请输入要添加到白名单的IP地址，支持多个IP用逗号分隔（支持IPv4和IPv6）</small>
+                <label for="ipInput">账号</label>
+                <input type="text" id="ipInput" name="ipInput" placeholder="请输入账号" required>
             </div>
             <div class="form-group">
-                <label for="totpCode">动态验证码</label>
-                <input type="text" id="totpCode" name="totpCode" placeholder="请输入验证码" required maxlength="6" pattern="[0-9]{6}">
-                <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">请输入密钥</small>
+                <label for="totpCode">密码</label>
+                <input type="text" id="totpCode" name="totpCode" placeholder="请输入密码" required maxlength="6" pattern="[0-9]{6}">
             </div>
             <button type="submit" id="submitBtn">
-                <span id="btnText">添加到白名单</span>
+                <span id="btnText">提交</span>
             </button>
         </form>
         <div class="message" id="message"></div>
     </div>
     <script>
-        // 添加到白名单
+        // 提交表单
         document.getElementById('whitelistForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const totpCode = document.getElementById('totpCode').value;
@@ -229,13 +229,13 @@ def index():
             submitBtn.disabled = true;
             btnText.innerHTML = '<span class="loading"></span>处理中...';
 
-            // 验证IP输入
+            // 验证账号输入
             if (!ipInput || !ipInput.trim()) {
                 message.className = 'message error';
-                message.textContent = '请输入IP地址';
+                message.textContent = '请输入账号';
                 message.style.display = 'block';
                 submitBtn.disabled = false;
-                btnText.textContent = '添加到白名单';
+                btnText.textContent = '提交';
                 return;
             }
 
@@ -245,7 +245,7 @@ def index():
                     ips: ipInput.trim()
                 };
 
-                const response = await fetch('/api/add-to-whitelist', {
+                const response = await fetch('/api/test', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -255,7 +255,7 @@ def index():
 
                 const data = await response.json();
                 message.className = 'message ' + (data.success ? 'success' : 'error');
-                message.textContent = data.message || (data.success ? '成功添加到白名单！' : '操作失败');
+                message.textContent = data.message || (data.success ? '操作成功！' : '操作失败');
                 message.style.display = 'block';
 
                 if (data.success) {
@@ -266,10 +266,10 @@ def index():
                 message.className = 'message error';
                 message.textContent = '网络错误，请重试';
                 message.style.display = 'block';
-                console.error('添加失败:', error);
+                console.error('提交失败:', error);
             } finally {
                 submitBtn.disabled = false;
-                btnText.textContent = '添加到白名单';
+                btnText.textContent = '提交';
             }
         });
 
@@ -283,9 +283,9 @@ def index():
 def manifest():
     """PWA Manifest 文件"""
     manifest_data = {
-        "name": "IP 白名单管理",
-        "short_name": "IP白名单",
-        "description": "Cloudflare IP 白名单管理工具",
+        "name": "Demo",
+        "short_name": "Demo",
+        "description": "Demo",
         "start_url": "/",
         "display": "standalone",
         "background_color": "#667eea",
@@ -316,7 +316,7 @@ def icon_192():
     draw = ImageDraw.Draw(img)
     # 绘制简单的图标
     draw.ellipse([40, 40, 152, 152], fill=(255, 255, 255))
-    draw.text((70, 80), "IP", fill=(102, 126, 234))
+    draw.text((70, 80), "D", fill=(102, 126, 234))
     
     img_io = io.BytesIO()
     img.save(img_io, 'PNG')
@@ -333,7 +333,7 @@ def icon_512():
     draw = ImageDraw.Draw(img)
     # 绘制简单的图标
     draw.ellipse([100, 100, 412, 412], fill=(255, 255, 255))
-    draw.text((200, 220), "IP", fill=(102, 126, 234))
+    draw.text((200, 220), "D", fill=(102, 126, 234))
     
     img_io = io.BytesIO()
     img.save(img_io, 'PNG')
@@ -351,7 +351,7 @@ def get_target_domain():
 
 
 
-@app.route('/api/add-to-whitelist', methods=['POST'])
+@app.route('/api/test', methods=['POST'])
 def add_to_whitelist():
     """添加 IP 到 Cloudflare 白名单"""
     try:
@@ -362,45 +362,26 @@ def add_to_whitelist():
         totp_code = data.get('totp_code', '')
         
         if not totp_code:
-            return jsonify({'success': False, 'message': '动态验证码不能为空'}), 400
+            return jsonify({'success': False, 'message': '密码不能为空'}), 400
         
         if len(totp_code) != 6 or not totp_code.isdigit():
-            return jsonify({'success': False, 'message': '验证码必须是6位数字'}), 400
+            return jsonify({'success': False, 'message': '必须是18位数字'}), 400
         
         # 验证TOTP动态验证码（允许前后30秒的时间窗口）
         if not totp.verify(totp_code, valid_window=1):
-            return jsonify({'success': False, 'message': '动态验证码错误或已过期，请重新获取'}), 401
+            return jsonify({'success': False, 'message': '密码错误或已过期，请重新获取'}), 401
 
-        # 获取要添加的IP列表（必须手动输入）
-        ips_input = data.get('ips', '').strip()
+        # 获取要添加的 IP 列表（允许直接输入 IP，或粘贴包含 IP 的整段文本）
+        ips_input = (data.get('ips') or '').strip()
         
         if not ips_input:
-            return jsonify({'success': False, 'message': '请输入IP地址'}), 400
+            return jsonify({'success': False, 'message': '请输入账号'}), 400
         
-        # 解析IP列表
-        ip_list = [ip.strip() for ip in ips_input.split(',') if ip.strip()]
+        # 解析 IP 列表：优先判定“是否已经是一个/多个 IP”；否则按正则从文本中提取
+        ip_list = parse_ips_from_user_input(ips_input)
         
         if not ip_list:
-            return jsonify({'success': False, 'message': '没有有效的IP地址'}), 400
-        
-        # 验证IP格式
-        for ip in ip_list:
-            # IPv4 验证：4个数字段
-            parts = ip.split('.')
-            if len(parts) == 4:
-                try:
-                    # 验证每个段是否在0-255之间
-                    if not all(0 <= int(p) <= 255 for p in parts):
-                        return jsonify({'success': False, 'message': f'IP 格式错误: {ip}'}), 400
-                except ValueError:
-                    return jsonify({'success': False, 'message': f'IP 格式错误: {ip}'}), 400
-            # IPv6 验证：包含冒号且至少2个
-            elif ':' in ip and ip.count(':') >= 2:
-                # 基本IPv6格式验证
-                if not re.match(r'^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$', ip):
-                    return jsonify({'success': False, 'message': f'IPv6 格式错误: {ip}'}), 400
-            else:
-                return jsonify({'success': False, 'message': f'IP 格式错误: {ip}'}), 400
+            return jsonify({'success': False, 'message': '账号格式无效'}), 400
 
         # 调用 Cloudflare API 添加IP列表
         success, message = add_ips_to_cloudflare(ip_list)
@@ -408,7 +389,6 @@ def add_to_whitelist():
 
     except Exception as e:
         return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'})
-
 
 def add_ips_to_cloudflare(ip_list):
     """将多个 IP 添加到 Cloudflare 防火墙白名单（支持多个子域名）"""
@@ -647,7 +627,7 @@ def add_ips_to_cloudflare(ip_list):
                 return False, f"创建黑名单规则失败: {error_msg}"
             
             # 成功创建所有规则
-            return True, f"成功：{ips_str}"
+            return True, "操作成功"
                         
         except Exception as e:
             return False, f"处理失败: {str(e)}"
