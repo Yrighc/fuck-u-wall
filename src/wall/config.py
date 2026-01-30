@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # 如果 .env 里写错了格式，启动时会直接报错，阻断风险
     # totp 密钥 (用于生成动态验证码)
     # 可以使用 pyotp.random_base32() 生成，或使用页面上的二维码/密钥
-    port: int
+    port: int = 8080  # 应用监听端口，默认 8080
     totp_secret: str
 
     # Cloudflare Api Token (需要有编辑防火墙规则的权限)
