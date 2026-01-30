@@ -137,7 +137,7 @@ jobs:
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
               --restart always \
-              -p 8080:8080 \
+              -p 127.0.0.1:8080:8080 \
               -e TOTP_SECRET="${{ secrets.TOTP_SECRET }}" \
               -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
               -e CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}" \
