@@ -10,9 +10,11 @@ on:
 
 env:
   PYTHON_VERSION: "3.12"
-  # 配置 Docker 镜像名称 (默认使用 GitHub Container Registry)
   REGISTRY: ghcr.io
+  # 引用 github.repository 变量 (注意：如果用户名有大写，Docker可能会报错，建议确保全是小写)
   IMAGE_NAME: ${{ github.repository }}
+  # 定义容器运行时的名称，方便停止和重启
+  CONTAINER_NAME: fuck-u-wall
 
 jobs:
   # ------------------------------------------------------------------
@@ -44,18 +46,17 @@ jobs:
         run: uv run mypy .
 
       - name: Run Tests (Pytest)
-        # 设置必要的环境变量以绕过应用启动时的检查
         env:
           PORT: "8080"
           SECRET_KEY: "test-secret-key"
           CLOUDFLARE_API_TOKEN: "test-token"
           CLOUDFLARE_ZONE_ID: "test-zone-id"
           SUBDOMAIN: "test.example.com"
-          TOTP_SECRET: "test-totp-secret" # 示例 Base32 密钥
+          TOTP_SECRET: "test-totp-secret"
         run: uv run pytest
 
   # ------------------------------------------------------------------
-  # 阶段二：构建 Docker 镜像 (仅检查构建，Tag 推送时才 Push)
+  # 阶段二：构建 Docker 镜像 (Push 到 GHCR)
   # ------------------------------------------------------------------
   build-image:
     needs: quality-check
@@ -79,7 +80,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -89,6 +90,7 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == 'format("refs/heads/{0}", "main")' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -99,3 +101,50 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ------------------------------------------------------------------
+  # 阶段三：部署到 VPS (CD)
+  # ------------------------------------------------------------------
+  deploy:
+    needs: build-image  # 必须等构建成功
+    # 仅在 main 分支推送时部署 (Tag 推送通常用于发布 Release，是否自动部署看你需求)
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          # 记得使用“直连域名”或 IP，避开 Cloudflare 代理
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWD }}
+          port: ${{ secrets.VPS__PORT }}
+          script: |
+            # 1. 登录 GHCR
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # 2. 拉取最新镜像 (main tag)
+            # 注意：github.repository 变量可能会有大小写问题，标准 Docker 镜像名应全小写
+            # 这里直接拉取 :main 标签
+            docker pull ghcr.io/${{ github.repository }}:main
+            
+            # 3. 停止并删除旧容器
+            docker stop ${{ env.CONTAINER_NAME }} || true
+            docker rm ${{ env.CONTAINER_NAME }} || true
+            
+            # 4. 启动新容器
+            # 这里注入你需要的所有环境变量
+            docker run -d \
+              --name ${{ env.CONTAINER_NAME }} \
+              --restart always \
+              -p 8080:8080 \
+              -e TOTP_SECRET="${{ secrets.TOTP_SECRET }}" \
+              -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+              -e CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+              -e CLOUDFLARE_ZONE_ID="${{ secrets.CLOUDFLARE_ZONE_ID }}" \
+              -e SUBDOMAIN="${{ secrets.SUBDOMAIN }}" \
+              ghcr.io/${{ github.repository }}:main
+            
+            # 5. 清理垃圾
+            docker image prune -f
