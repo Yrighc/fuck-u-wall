@@ -1,0 +1,84 @@
+[project]
+name = "wall"
+version = "0.1.0"
+description = "一个轻量级的 Web 应用，用于自动将当前 IP 地址添加到 Cloudflare 的防火墙白名单中。"
+readme = "README.md"
+# 将 Python 版本降级为当前主流的 LTS 版本 (3.12+)，3.14 太超前会导致生态断层
+requires-python = ">=3.12"
+authors = [
+    { name = "konglquan", email = "your.email@example.com" }
+]
+
+# 核心生产依赖 (Production Dependencies)
+dependencies = [
+    "Flask>=3.0.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "Pillow>=10.1.0",
+    "pyotp>=2.9.0",
+    "typer>=0.21.1",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+]
+
+[project.scripts]
+# 左边是你在终端敲的命令，右边是 Python 调用的路径
+# 语法：command-name = "package.module:function"
+wall = "wall.main:main"
+
+[build-system]
+# hatchling 与 uv 配合更顺滑
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# 必须指向 src 下真实的包目录名，通常是全小写
+packages = ["src/wall"]
+
+# ------------------------------------------------------------------
+# 依赖组配置 (Dependency Groups - UV Native)
+# ------------------------------------------------------------------
+# 修正 3: 使用 uv 推荐的 [dependency-groups] 管理开发依赖
+# 移除了重复的定义，确保版本约束单一来源
+[dependency-groups]
+dev = [
+    "mypy>=1.8.0",
+    "pre-commit>=4.0.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.1.0",
+]
+
+# ------------------------------------------------------------------
+# 工具配置区 (Tool Configuration)
+# ------------------------------------------------------------------
+[tool.ruff]
+line-length = 88
+target-version = "py312" # 随项目版本调整
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP"]
+ignore = []
+
+# 2. MyPy 配置
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+no_implicit_optional = true
+
+# 3. Pytest 配置
+[tool.pytest.ini_options]
+addopts = "-vs --cov=src --cov-report=term-missing"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+filterwarnings = [
+    # 格式：action:message:category:module:line
+    # 忽略 py_mini_racer 内部抛出的关于 _pack_ 的废弃警告
+    "ignore:.*Due to '_pack_'.*:DeprecationWarning:py_mini_racer.*"
+]
+
+# 4. Coverage 配置 (新增建议，防止 pytest-cov 报错后统计混乱)
+[tool.coverage.run]
+branch = true
+source = ["src"]
