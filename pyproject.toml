@@ -53,7 +53,7 @@ dev = [
 # 工具配置区 (Tool Configuration)
 # ------------------------------------------------------------------
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py312" # 随项目版本调整
 
 [tool.ruff.lint]

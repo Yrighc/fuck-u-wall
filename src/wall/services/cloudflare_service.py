@@ -1,3 +1,5 @@
+import logging
+
 import requests
 
 
@@ -224,11 +226,13 @@ class CloudflareService:
             result = response.json()
             errors = result.get("errors", [])
             return errors[0].get("message", default_msg) if errors else default_msg
-        except:
+        except Exception as e:
+            logging.error(f"解析 Cloudflare 错误响应失败: {str(e)}")
             return default_msg
 
     def _safe_delete(self, url, resource_id):
         try:
             requests.delete(f"{url}/{resource_id}", headers=self.headers, timeout=5)
-        except:
+        except Exception as e:
+            logging.error(f"删除资源 {resource_id} 失败: {str(e)}")
             pass

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 IP 解析工具：支持用户直接输入一个/多个 IP，或从粘贴的整段文本中提取 IP。
@@ -88,4 +87,3 @@ def parse_ips_from_user_input(user_text: str) -> list[str]:
         return out
 
     return _extract_ips_by_regex(user_text)
-

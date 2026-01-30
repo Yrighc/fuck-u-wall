@@ -60,13 +60,13 @@ except ValidationError as e:
     # 捕获校验错误，进行自定义渲染
     print("\n❌ \033[91m配置加载失败 (Configuration Error)\033[0m")
     print("--------------------------------------------------")
-    print(f"配置文件路径: {ROOT_DIR}") # 如果你有变量存路径的话
+    print(f"配置文件路径: {ROOT_DIR}")  # 如果你有变量存路径的话
     print("检测到以下必填参数缺失或格式错误：\n")
     # 遍历错误列表，提取字段名
     for error in e.errors():
         # error['loc'] 通常是 ('field_name',)
-        field_name = error['loc'][0]
-        msg = error['msg']
+        field_name = error["loc"][0]
+        msg = error["msg"]
         print(f"  • \033[93m{field_name}\033[0m: {msg}")
 
     print("\n💡 \033[92m请检查你的 .env 文件，或参考 .env.example 补全配置。\033[0m")
