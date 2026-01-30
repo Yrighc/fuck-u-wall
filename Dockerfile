@@ -1,37 +1,38 @@
-# 使用 Python 官方 slim 镜像，减小镜像大小
-FROM python:3.11-slim
+# 使用 Python 3.12 (与 pyproject.toml 保持一致)
+FROM python:3.12-slim
+
+# 1. 安装 uv (从官方镜像复制二进制文件)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # 设置工作目录
 WORKDIR /app
 
-# 设置环境变量
+# 环境变量设置
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    UV_COMPILE_BYTECODE=1 \
+    # 告诉 uv 将环境安装到系统或指定位置，这里我们让 uv 管理 .venv，然后加到 PATH
+    UV_LINK_MODE=copy
 
-# 安装系统依赖（包括字体库，用于生成验证码）
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    libfreetype6-dev \
-    libjpeg-dev \
-    zlib1g-dev \
-    fonts-dejavu-core \
-    fonts-liberation && \
-    rm -rf /var/lib/apt/lists/*
+# 2. 复制依赖定义文件
+COPY pyproject.toml uv.lock ./
 
-# 复制依赖文件
-COPY requirements.txt .
+# 3. 安装依赖 (不包含项目本身，利用缓存)
+# --frozen: 严格按照 uv.lock 安装
+# --no-dev: 仅安装生产依赖
+# --no-install-project: 这一步只装依赖库，不装本项目代码
+RUN uv sync --frozen --no-dev --no-install-project
 
-# 安装依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 4. 复制项目源码
+COPY src ./src
 
-# 复制应用代码
-COPY app.py .
-COPY ip_parser.py .
+# 5. 安装项目本身
+RUN uv sync --frozen --no-dev
+
+# 6. 将虚拟环境加入 PATH
+ENV PATH="/app/.venv/bin:$PATH"
 
 # 暴露端口
 EXPOSE 8080
 
-# 运行应用
-CMD ["python", "app.py"]
+# 启动命令 (使用 pyproject.toml 中定义的 scripts)
+CMD ["wall", "start"]

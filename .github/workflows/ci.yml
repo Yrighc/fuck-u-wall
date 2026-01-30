@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: fuck-u-wall-build-publish
 
 on:
   push:
