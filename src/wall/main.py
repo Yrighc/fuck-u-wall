@@ -14,7 +14,7 @@ app = typer.Typer(
 
 
 @app.command()
-def version():
+def version() -> None:
     """
     显示当前系统版本。
     """
@@ -23,14 +23,14 @@ def version():
 
 
 @app.command()
-def start():
+def start() -> None:
     """
     启动 Wall 应用程序。
     """
     run_app()  # 调用run_app函数来运行应用程序
 
 
-def main():
+def main() -> None:
     """
     程序的主入口函数
     该函数用于启动应用程序

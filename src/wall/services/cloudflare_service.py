@@ -1,10 +1,11 @@
 import logging
+from typing import Any
 
 import requests
 
 
 class CloudflareService:
-    def __init__(self, api_token, zone_id, subdomains):
+    def __init__(self, api_token: str, zone_id: str, subdomains: list[str]) -> None:
         self.api_token = api_token
         self.zone_id = zone_id
         self.subdomains = subdomains
@@ -14,7 +15,7 @@ class CloudflareService:
         }
         self.base_url = "https://api.cloudflare.com/client/v4"
 
-    def add_ips_to_whitelist(self, ip_list):
+    def add_ips_to_whitelist(self, ip_list: list[str]) -> tuple[bool, str]:
         """将多个 IP 添加到 Cloudflare 防火墙白名单（支持多个子域名）"""
 
         # 使用 Firewall Rules API
@@ -33,9 +34,9 @@ class CloudflareService:
         except Exception as e:
             return False, f"处理失败: {str(e)}"
 
-    def _delete_existing_rules(self, rules_url, filters_url):
+    def _delete_existing_rules(self, rules_url: str, filters_url: str) -> None:
         # 获取所有规则（处理分页）
-        all_rules = []
+        all_rules: list[Any] = []
         page = 1
         per_page = 100
 
@@ -99,7 +100,7 @@ class CloudflareService:
                 except Exception:
                     pass
 
-    def _create_new_rules(self, rules_url, filters_url, ip_list):
+    def _create_new_rules(self, rules_url: str, filters_url: str, ip_list: list[str]) -> tuple[bool, str]:
         domains_str = ", ".join(self.subdomains)
         ips_str = ", ".join(ip_list)
 
@@ -215,24 +216,24 @@ class CloudflareService:
         except Exception as e:
             return False, f"处理失败: {str(e)}"
 
-    def _check_response(self, response):
+    def _check_response(self, response: requests.Response) -> bool:
         if response.status_code != 200:
             return False
         data = response.json()
-        return data.get("success", False)
+        return bool(data.get("success", False))
 
-    def _get_error_msg(self, response, default_msg):
+    def _get_error_msg(self, response: requests.Response, default_msg: str) -> str:
         try:
             result = response.json()
             errors = result.get("errors", [])
-            return errors[0].get("message", default_msg) if errors else default_msg
+            return str(errors[0].get("message", default_msg)) if errors else default_msg
         except Exception as e:
             logging.error(f"解析 Cloudflare 错误响应失败: {str(e)}")
             return default_msg
 
-    def _safe_delete(self, url, resource_id):
+    def _safe_delete(self, url: str, resource_id: str) -> None:
         try:
             requests.delete(f"{url}/{resource_id}", headers=self.headers, timeout=5)
-        except Exception as e:
-            logging.error(f"删除资源 {resource_id} 失败: {str(e)}")
+        except Exception:
+            logging.error(f"删除资源 {resource_id} 失败")
             pass

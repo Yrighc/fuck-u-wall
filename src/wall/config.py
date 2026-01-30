@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     subdomain: str
 
     # 4. 计算属性 (衍生配置)
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_production(self) -> bool:
         return self.app_env == "prod"

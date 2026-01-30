@@ -47,6 +47,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
     "ruff>=0.1.0",
+    "types-requests>=2.32.4.20260107",
 ]
 
 # ------------------------------------------------------------------
@@ -62,9 +63,17 @@ ignore = []
 
 # 2. MyPy 配置
 [tool.mypy]
-strict = true
-ignore_missing_imports = true
-no_implicit_optional = true
+# 以下是 mypy 类型检查器的配置选项
+strict = true  # 启用严格模式，进行更严格的类型检查
+ignore_missing_imports = true  # 忽略缺失的导入模块，不报错
+no_implicit_optional = true  # 不允许将可选参数隐式转换为必需参数
+# 启用 pydantic 插件，让 MyPy 理解 Settings() 不需要传参
+plugins = ["pydantic.mypy"]
+# 建议开启这些选项，让检查更准确
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = true
 
 # 3. Pytest 配置
 [tool.pytest.ini_options]

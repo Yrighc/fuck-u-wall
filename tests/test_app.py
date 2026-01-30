@@ -1,10 +1,11 @@
 import pytest
+from flask.testing import FlaskClient
 
 from wall.app import app
 
 
 @pytest.fixture
-def client():
+def client() -> object:
     app.config["TESTING"] = True
     # 设置必要的环境变量模拟
     # 在实际测试中，可能需要 mock 掉 settings 或环境变量
@@ -12,7 +13,7 @@ def client():
         yield client
 
 
-def test_index_page(client):
+def test_index_page(client: FlaskClient) -> None:
     """测试首页能否正常访问 (冒烟测试)"""
     # 模拟环境变量，防止 app 启动检查失败 (虽然 app.py 在 import 时已经执行了部分逻辑)
     # 由于 app.py 模块级别的代码会在 import 时执行，
@@ -26,7 +27,7 @@ def test_index_page(client):
     assert b"IP" in response.data
 
 
-def test_manifest_json(client):
+def test_manifest_json(client: FlaskClient) -> None:
     """测试 Manifest 文件"""
     response = client.get("/manifest.json")
     assert response.status_code == 200
