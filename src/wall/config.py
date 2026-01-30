@@ -9,8 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # 定义根目录，方便定位 .env 文件
 ROOT_DIR = Path(__file__).parents[2]
 
-print(f"Config root dir: {ROOT_DIR}")
-
+# print(f"Config root dir: {ROOT_DIR}")
 
 class Settings(BaseSettings):
     # 1. 环境标识：决定加载哪个配置策略
