@@ -119,7 +119,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWD }}
-          port: ${{ secrets.VPS__PORT }}
+          port: ${{ secrets.VPS_PORT }}
           script: |
             # 1. 登录 GHCR
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
