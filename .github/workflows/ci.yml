@@ -46,6 +46,7 @@ jobs:
       - name: Run Tests (Pytest)
         # 设置必要的环境变量以绕过应用启动时的检查
         env:
+          PORT: "8080"
           SECRET_KEY: "test-secret-key"
           CLOUDFLARE_API_TOKEN: "test-token"
           CLOUDFLARE_ZONE_ID: "test-zone-id"
