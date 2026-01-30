@@ -6,7 +6,7 @@ import warnings
 import pyotp
 from flask import Flask, Response, jsonify, render_template, request
 
-from wall.config import settings
+from wall.config import get_settings
 from wall.services.cloudflare_service import CloudflareService
 
 # 禁用 SSL 警告（仅在必要时）
@@ -15,49 +15,60 @@ warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
 
-# 从环境变量读取配置
-if not settings.subdomain or settings.subdomain.strip() == "":
-    raise ValueError(
-        "请设置 SUBDOMAIN 环境变量（子域名，支持多个用逗号分隔，如 api.example.com,admin.example.com）"
+# 全局变量 (将在 init_globals 中初始化)
+subdomain_list = []
+totp = None
+cloudflare_service = None
+
+def init_globals() -> None:
+    """初始化全局依赖，仅在应用启动时调用"""
+    global totp, cloudflare_service, subdomain_list
+
+    settings = get_settings()
+
+    # 从环境变量读取配置
+    if not settings.subdomain or settings.subdomain.strip() == "":
+        raise ValueError(
+            "请设置 SUBDOMAIN 环境变量（子域名，支持多个用逗号分隔，如 api.example.com,admin.example.com）"
+        )
+    subdomain_str = settings.subdomain
+    subdomain_list.extend(
+        [s.strip() for s in subdomain_str.split(",") if s.strip()] if subdomain_str else []
     )
-subdomain_str = (
-    settings.subdomain if settings.subdomain else os.getenv("SUBDOMAIN", "").strip()
-)
-subdomain_list = (
-    [s.strip() for s in subdomain_str.split(",") if s.strip()] if subdomain_str else []
-)
 
-# 如果没有设置TOTP密钥，生成一个新的
-if not settings.totp_secret or settings.totp_secret.strip() == "":
-    settings.totp_secret = pyotp.random_base32()
-    print(f"\n⚠️  未设置 TOTP_SECRET，已自动生成新的密钥: {settings.totp_secret}")
-    print(
-        "请将此密钥添加到环境变量 TOTP_SECRET 中，并使用 Authenticator 应用扫描二维码。"
+    # 如果没有设置TOTP密钥，生成一个新的
+    if not settings.totp_secret or settings.totp_secret.strip() == "":
+        # 注意：这里修改 settings 实例可能只会影响当前内存中的对象，重启后失效
+        # 且 Pydantic 模型默认不可变，除非 config 设置为 allow_mutation (默认为 True)
+        settings.totp_secret = pyotp.random_base32()
+        print(f"\n⚠️  未设置 TOTP_SECRET，已自动生成新的密钥: {settings.totp_secret}")
+        print(
+            "请将此密钥添加到环境变量 TOTP_SECRET 中，并使用 Authenticator 应用扫描二维码。"
+        )
+
+    if (
+        not settings.cloudflare_api_token
+        or not settings.cloudflare_api_token.strip() != ""
+        or not settings.cloudflare_zone_id
+        or not settings.cloudflare_zone_id.strip() != ""
+    ):
+        raise ValueError("请设置 CLOUDFLARE_API_TOKEN 和 CLOUDFLARE_ZONE_ID 环境变量")
+
+    if not isinstance(settings.port, int):
+        try:
+            settings.port = int(settings.port)
+        except (ValueError, TypeError):
+            settings.port = 8080  # 默认值
+
+    # 初始化TOTP
+    totp = pyotp.TOTP(settings.totp_secret)
+
+    # 初始化 Cloudflare Service
+    cloudflare_service = CloudflareService(
+        api_token=settings.cloudflare_api_token,
+        zone_id=settings.cloudflare_zone_id,
+        subdomains=subdomain_list,
     )
-
-if (
-    not settings.cloudflare_api_token
-    or not settings.cloudflare_api_token.strip() != ""
-    or not settings.cloudflare_zone_id
-    or not settings.cloudflare_zone_id.strip() != ""
-):
-    raise ValueError("请设置 CLOUDFLARE_API_TOKEN 和 CLOUDFLARE_ZONE_ID 环境变量")
-
-if not isinstance(settings.port, int):
-    try:
-        settings.port = int(settings.port)
-    except (ValueError, TypeError):
-        settings.port = 8080  # 默认值
-
-# 初始化TOTP
-totp = pyotp.TOTP(settings.totp_secret)
-
-# 初始化 Cloudflare Service
-cloudflare_service = CloudflareService(
-    api_token=settings.cloudflare_api_token,
-    zone_id=settings.cloudflare_zone_id,
-    subdomains=subdomain_list,
-)
 
 
 # 安全响应头
@@ -139,7 +150,7 @@ def icon_512() -> Response:
 @app.route("/api/get-target-domain", methods=["GET"])
 def get_target_domain() -> Response:
     """获取目标域名信息"""
-    domains = ", ".join(settings.subdomain)
+    domains = ", ".join(get_settings().subdomain)
     return jsonify({"success": True, "domain": domains, "domains": subdomain_list})
 
 
@@ -160,6 +171,9 @@ def add_to_whitelist() -> tuple[Response, int]:
             return jsonify({"success": False, "message": "验证码必须是6位数字"}), 400
 
         # 验证TOTP动态验证码（允许前后30秒的时间窗口）
+        if totp is None:
+            return jsonify({"success": False, "message": "TOTP 服务未初始化"}), 500
+
         if not totp.verify(totp_code, valid_window=1):
             return (
                 jsonify(
@@ -211,6 +225,9 @@ def add_to_whitelist() -> tuple[Response, int]:
                 return jsonify({"success": False, "message": f"IP 格式错误: {ip}"}), 400
 
         # 调用 Cloudflare API 添加IP列表
+        if cloudflare_service is None:
+            return jsonify({"success": False, "message": "服务未初始化"}), 500
+
         success, message = cloudflare_service.add_ips_to_whitelist(ip_list)
         return jsonify({"success": success, "message": message}), (
             200 if success else 500
@@ -221,5 +238,7 @@ def add_to_whitelist() -> tuple[Response, int]:
 
 
 def run_app() -> None:
+    init_globals()
+    settings = get_settings()
     app.run(host="0.0.0.0", port=settings.port, debug=False)
     print(f"🚀 应用正在运行，访问地址: http://localhost:{settings.port}")

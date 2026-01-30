@@ -3,7 +3,10 @@ from typing import Any
 
 import requests
 
-
+"""
+CloudflareService 类：用于管理 Cloudflare 防火墙规则的服务类
+提供将 IP 添加到白名单的功能，支持多个子域名
+"""
 class CloudflareService:
     def __init__(self, api_token: str, zone_id: str, subdomains: list[str]) -> None:
         self.api_token = api_token
