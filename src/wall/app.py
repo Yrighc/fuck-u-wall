@@ -8,6 +8,7 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from wall.config import get_settings
 from wall.services.cloudflare_service import CloudflareService
+from wall.utils.ip_utils import get_public_ip
 
 # 禁用 SSL 警告（仅在必要时）
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
@@ -90,7 +91,8 @@ def set_security_headers(response: Response) -> Response:
 @app.route("/")
 def index() -> str:
     """返回主页面"""
-    return render_template("index.html")
+    client_ip = get_public_ip()
+    return render_template("index.html", client_ip=client_ip)
 
 
 @app.route("/manifest.json")
