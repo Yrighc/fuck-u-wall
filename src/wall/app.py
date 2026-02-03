@@ -99,9 +99,9 @@ def index() -> str:
 def manifest() -> Response:
     """PWA Manifest 文件"""
     manifest_data = {
-        "name": "IP 白名单管理",
-        "short_name": "IP白名单",
-        "description": "Cloudflare IP 白名单管理工具",
+        "name": "WALL_OVERRIDE_CONSOLE",
+        "short_name": "OVERRIDE",
+        "description": "Cloudflare Firewall Override Tool",
         "start_url": "/",
         "display": "standalone",
         "background_color": "#667eea",
@@ -162,24 +162,24 @@ def add_to_whitelist() -> tuple[Response, int]:
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"success": False, "message": "请求数据无效"}), 400
+            return jsonify({"success": False, "message": "INVALID_PAYLOAD"}), 400
 
         totp_code = data.get("totp_code", "")
 
         if not totp_code:
-            return jsonify({"success": False, "message": "动态验证码不能为空"}), 400
+            return jsonify({"success": False, "message": "TOKEN_MISSING"}), 400
 
         if len(totp_code) != 6 or not totp_code.isdigit():
-            return jsonify({"success": False, "message": "验证码必须是6位数字"}), 400
+            return jsonify({"success": False, "message": "TOKEN_FORMAT_INVALID"}), 400
 
         # 验证TOTP动态验证码（允许前后30秒的时间窗口）
         if totp is None:
-            return jsonify({"success": False, "message": "TOTP 服务未初始化"}), 500
+            return jsonify({"success": False, "message": "SYSTEM_ERROR: TOTP_SERVICE_OFFLINE"}), 500
 
         if not totp.verify(totp_code, valid_window=1):
             return (
                 jsonify(
-                    {"success": False, "message": "动态验证码错误或已过期，请重新获取"}
+                    {"success": False, "message": "ACCESS_DENIED: INVALID_TOKEN"}
                 ),
                 401,
             )
@@ -188,13 +188,13 @@ def add_to_whitelist() -> tuple[Response, int]:
         ips_input = data.get("ips", "").strip()
 
         if not ips_input:
-            return jsonify({"success": False, "message": "请输入IP地址"}), 400
+            return jsonify({"success": False, "message": "TARGET_MISSING"}), 400
 
         # 解析IP列表
         ip_list = [ip.strip() for ip in ips_input.split(",") if ip.strip()]
 
         if not ip_list:
-            return jsonify({"success": False, "message": "没有有效的IP地址"}), 400
+            return jsonify({"success": False, "message": "NO_VALID_TARGETS"}), 400
 
         # 验证IP格式
         for ip in ip_list:
@@ -206,13 +206,13 @@ def add_to_whitelist() -> tuple[Response, int]:
                     if not all(0 <= int(p) <= 255 for p in parts):
                         return (
                             jsonify(
-                                {"success": False, "message": f"IP 格式错误: {ip}"}
+                                {"success": False, "message": f"INVALID_TARGET_FORMAT: {ip}"}
                             ),
                             400,
                         )
                 except ValueError:
                     return (
-                        jsonify({"success": False, "message": f"IP 格式错误: {ip}"}),
+                        jsonify({"success": False, "message": f"INVALID_TARGET_FORMAT: {ip}"}),
                         400,
                     )
             # IPv6 验证：包含冒号且至少2个
@@ -220,15 +220,15 @@ def add_to_whitelist() -> tuple[Response, int]:
                 # 基本IPv6格式验证
                 if not re.match(r"^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$", ip):
                     return (
-                        jsonify({"success": False, "message": f"IPv6 格式错误: {ip}"}),
+                        jsonify({"success": False, "message": f"INVALID_IPV6_FORMAT: {ip}"}),
                         400,
                     )
             else:
-                return jsonify({"success": False, "message": f"IP 格式错误: {ip}"}), 400
+                return jsonify({"success": False, "message": f"INVALID_TARGET_FORMAT: {ip}"}), 400
 
         # 调用 Cloudflare API 添加IP列表
         if cloudflare_service is None:
-            return jsonify({"success": False, "message": "服务未初始化"}), 500
+            return jsonify({"success": False, "message": "SYSTEM_ERROR: CLOUDFLARE_SERVICE_OFFLINE"}), 500
 
         success, message = cloudflare_service.add_ips_to_whitelist(ip_list)
         return jsonify({"success": success, "message": message}), (
@@ -236,7 +236,7 @@ def add_to_whitelist() -> tuple[Response, int]:
         )
 
     except Exception as e:
-        return jsonify({"success": False, "message": f"服务器错误: {str(e)}"}), 500
+        return jsonify({"success": False, "message": f"SYSTEM_CRITICAL_FAILURE: {str(e)}"}), 500
 
 
 def run_app() -> None:

@@ -33,9 +33,9 @@ class CloudflareService:
             return self._create_new_rules(rules_url, filters_url, ip_list)
 
         except requests.exceptions.RequestException as e:
-            return False, f"请求 Cloudflare API 失败: {str(e)}"
+            return False, f"API_REQUEST_FAILED: {str(e)}"
         except Exception as e:
-            return False, f"处理失败: {str(e)}"
+            return False, f"PROCESS_FAILED: {str(e)}"
 
     def _delete_existing_rules(self, rules_url: str, filters_url: str) -> None:
         # 获取所有规则（处理分页）
@@ -133,7 +133,7 @@ class CloudflareService:
 
             if not self._check_response(whitelist_filter_response):
                 return False, self._get_error_msg(
-                    whitelist_filter_response, "创建白名单过滤器失败"
+                    whitelist_filter_response, "FILTER_CREATION_FAILED (WHITELIST)"
                 )
 
             whitelist_filter_result = whitelist_filter_response.json()
@@ -156,7 +156,7 @@ class CloudflareService:
             if not self._check_response(whitelist_rule_response):
                 self._safe_delete(filters_url, whitelist_filter_id)
                 return False, self._get_error_msg(
-                    whitelist_rule_response, "创建白名单规则失败"
+                    whitelist_rule_response, "RULE_CREATION_FAILED (WHITELIST)"
                 )
 
             whitelist_rule_result = whitelist_rule_response.json()
@@ -186,7 +186,7 @@ class CloudflareService:
                 self._safe_delete(rules_url, whitelist_rule_id)
                 self._safe_delete(filters_url, whitelist_filter_id)
                 return False, self._get_error_msg(
-                    blacklist_filter_response, "创建黑名单过滤器失败"
+                    blacklist_filter_response, "FILTER_CREATION_FAILED (BLACKLIST)"
                 )
 
             blacklist_filter_result = blacklist_filter_response.json()
@@ -211,13 +211,13 @@ class CloudflareService:
                 self._safe_delete(filters_url, whitelist_filter_id)
                 self._safe_delete(filters_url, blacklist_filter_id)
                 return False, self._get_error_msg(
-                    blacklist_rule_response, "创建黑名单规则失败"
+                    blacklist_rule_response, "RULE_CREATION_FAILED (BLACKLIST)"
                 )
 
-            return True, f"成功：{ips_str}"
+            return True, f"OVERRIDE_SUCCESSFUL: {ips_str}"
 
         except Exception as e:
-            return False, f"处理失败: {str(e)}"
+            return False, f"PROCESS_FAILED: {str(e)}"
 
     def _check_response(self, response: requests.Response) -> bool:
         if response.status_code != 200:

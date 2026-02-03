@@ -1,118 +1,312 @@
+:root {
+    --bg-color: #050505;
+    --card-bg: rgba(20, 20, 20, 0.6);
+    --primary-color: #00ff41; /* 经典黑客绿 */
+    --primary-glow: rgba(0, 255, 65, 0.4);
+    --secondary-color: #008f11;
+    --text-color: #e0e0e0;
+    --input-bg: rgba(0, 0, 0, 0.5);
+    --border-color: #333;
+    --font-mono: 'Courier New', Courier, monospace;
+}
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: var(--font-mono);
+    background-color: var(--bg-color);
+    background-image: 
+        radial-gradient(circle at 50% 50%, rgba(0, 50, 0, 0.1) 0%, transparent 60%),
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 100%, 100% 2px, 3px 100%;
+    color: var(--text-color);
     min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 20px;
-}
-.container {
-    background: white;
-    border-radius: 20px;
-    padding: 30px 20px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    max-width: 500px;
-    width: 100%;
-    margin: 0 auto;
+    overflow-x: hidden;
 }
 
-@media (max-width: 480px) {
-    .container {
-        padding: 20px 15px;
-        border-radius: 15px;
-    }
-    h1 {
-        font-size: 24px;
-    }
-}
-h1 {
-    color: #333;
-    margin-bottom: 30px;
-    text-align: center;
-    font-size: 28px;
-}
-.form-group {
-    margin-bottom: 20px;
-}
-label {
+/* CRT 扫描线效果 */
+body::before {
+    content: " ";
     display: block;
-    color: #333;
-    margin-bottom: 8px;
-    font-weight: 500;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+    background-size: 100% 4px;
+    z-index: -1;
+    pointer-events: none;
 }
-input {
+
+#matrixCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: -2; /* 放在扫描线后面 */
+    opacity: 0.2; /* 降低不透明度，不要喧宾夺主 */
+}
+
+.container {
+    background: transparent; /* 移除实体背景 */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none; /* 移除边框 */
+    box-shadow: none;
+    max-width: 520px;
     width: 100%;
-    padding: 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 16px;
-    transition: border-color 0.3s;
+    margin: 0 auto;
+    position: relative;
+    padding: 40px; /* 保持内边距 */
+    
+    /* HUD 四角瞄准框 */
+    background-image: 
+        linear-gradient(var(--primary-color), var(--primary-color)), 
+        linear-gradient(var(--primary-color), var(--primary-color)), 
+        linear-gradient(var(--primary-color), var(--primary-color)), 
+        linear-gradient(var(--primary-color), var(--primary-color));
+    background-repeat: no-repeat;
+    background-size: 20px 2px, 2px 20px;
+    background-position: top left, top left, bottom right, bottom right;
+    transition: all 0.5s ease;
 }
-input:focus {
-    outline: none;
-    border-color: #667eea;
-}
-button {
-    width: 100%;
-    padding: 14px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-}
-button:active {
-    transform: translateY(0);
-}
-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-}
-.message {
-    margin-top: 20px;
-    padding: 12px;
-    border-radius: 8px;
-    text-align: center;
-    font-size: 14px;
+
+/* 顶部装饰条移除，改为 HUD 风格 */
+.container::after {
     display: none;
 }
+
+/* 激活态：当内部有输入时，容器稍微发光 */
+.container:focus-within {
+    background-size: 40px 2px, 2px 40px; /* 瞄准框变大 */
+    filter: drop-shadow(0 0 10px var(--primary-glow));
+}
+
+h1 {
+    color: var(--primary-color);
+    margin-bottom: 40px;
+    text-align: center;
+    font-size: 28px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    text-shadow: 0 0 15px var(--primary-glow);
+    position: relative;
+}
+
+/* 标题下的装饰线 */
+h1::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+}
+
+.form-group {
+    display: grid;
+    grid-template-areas: 
+        "label input"
+        "help help";
+    grid-template-columns: auto 1fr;
+    gap: 10px 20px;
+    align-items: center;
+    margin-bottom: 35px; /* 增加间距 */
+    border-bottom: 1px solid rgba(0, 255, 65, 0.1);
+    padding-bottom: 10px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+/* 输入框激活时的行样式 */
+.form-group:focus-within {
+    border-bottom: 1px solid var(--primary-color);
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.05), transparent);
+}
+
+label {
+    grid-area: label;
+    color: var(--secondary-color); /* 默认稍暗 */
+    font-size: 14px;
+    letter-spacing: 1px;
+    font-weight: bold;
+    margin-bottom: 0;
+    text-shadow: none;
+    transition: 0.3s;
+}
+
+.form-group:focus-within label {
+    color: var(--primary-color);
+    text-shadow: 0 0 8px var(--primary-glow);
+}
+
+label::after {
+    content: " >";
+    color: var(--primary-color);
+    opacity: 0.5;
+}
+
+input {
+    grid-area: input;
+    width: 100%;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    font-family: var(--font-mono);
+    color: #fff;
+    font-size: 18px; /* 字体加大 */
+    transition: all 0.3s ease;
+    box-shadow: none;
+    caret-color: var(--primary-color); /* 光标颜色 */
+}
+
+input:focus {
+    outline: none;
+    border: none;
+    box-shadow: none;
+    /* 聚焦时添加扫描线背景 */
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 65, 0.1) 2px,
+        rgba(0, 255, 65, 0.1) 4px
+    );
+}
+
+small {
+    grid-area: help;
+    color: #666;
+    font-size: 10px;
+    margin-top: 0;
+    opacity: 0.6;
+    padding-left: 0;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.form-group:focus-within small {
+    color: var(--primary-color);
+    opacity: 0.8;
+}
+
+button {
+    width: 100%;
+    padding: 18px;
+    background: transparent;
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.1);
+    transition: 0.2s;
+}
+
+/* 按钮 Hover 故障效果 (Glitch) */
+button:hover {
+    background: var(--primary-color);
+    color: #000;
+    box-shadow: 0 0 30px var(--primary-glow);
+    text-shadow: 2px 0 #fff;
+}
+
+/* 简单的 Glitch 动画关键帧 */
+@keyframes glitch-anim-1 {
+    0% { clip-path: inset(20% 0 80% 0); transform: translate(-2px, 1px); }
+    20% { clip-path: inset(60% 0 10% 0); transform: translate(2px, -1px); }
+    40% { clip-path: inset(40% 0 50% 0); transform: translate(-2px, 2px); }
+    60% { clip-path: inset(80% 0 5% 0); transform: translate(2px, -2px); }
+    80% { clip-path: inset(10% 0 70% 0); transform: translate(-1px, 1px); }
+    100% { clip-path: inset(30% 0 50% 0); transform: translate(1px, -1px); }
+}
+
+/* 只有在 hover 时添加伪元素做 glitch */
+button:hover::before {
+    content: attr(data-text); /* 需要在 HTML 中设置 data-text */
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--primary-color);
+    color: #000;
+    overflow: hidden;
+    clip-path: inset(0 0 0 0);
+    animation: glitch-anim-1 0.3s infinite linear alternate-reverse;
+    opacity: 0.5;
+}
+
+.message {
+    /* 保持原样，微调背景 */
+    backdrop-filter: blur(2px);
+}
+
+.message {
+    margin-top: 25px;
+    padding: 15px;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 13px;
+    display: none;
+    font-family: var(--font-mono);
+    backdrop-filter: blur(5px);
+}
+
 .message.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-    display: block;
+    background: rgba(0, 255, 65, 0.1);
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
 }
+
 .message.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-    display: block;
+    background: rgba(255, 0, 0, 0.1);
+    color: #ff3333;
+    border: 1px solid #ff3333;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
 }
+
 .loading {
     display: inline-block;
     width: 16px;
     height: 16px;
-    border: 2px solid #ffffff;
+    border: 2px solid var(--primary-color);
     border-radius: 50%;
     border-top-color: transparent;
-    animation: spin 0.6s linear infinite;
-    margin-right: 8px;
+    animation: spin 0.8s linear infinite;
+    margin-right: 10px;
     vertical-align: middle;
 }
+
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* 适配移动端 */
+@media (max-width: 480px) {
+    .container {
+        padding: 25px 20px;
+    }
+    h1 {
+        font-size: 20px;
+    }
 }

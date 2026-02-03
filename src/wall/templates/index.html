@@ -1,35 +1,37 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#667eea">
-    <title>IP 白名单管理</title>
+    <meta name="theme-color" content="#050505">
+    <title>ROOT@WALL:~#</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    <canvas id="matrixCanvas"></canvas>
     <div class="container">
-        <h1>🌐 IP 白名单管理</h1>
+        <h1>SYSTEM_OVERRIDE_PANEL</h1>
         <form id="whitelistForm">
             <div class="form-group">
-                <label for="ipInput">IP 地址（支持多个用逗号分隔）</label>
-                <input type="text" id="ipInput" name="ipInput" placeholder="例如: 192.168.1.1,10.0.0.1" value="{{ client_ip if client_ip else '' }}" required>
-                <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">请输入要添加到白名单的IP地址，支持多个IP用逗号分隔（支持IPv4和IPv6）</small>
+                <label for="ipInput">TARGET_IP_ADDRESS</label>
+                <input type="text" id="ipInput" name="ipInput" placeholder="ex: 192.168.x.x, 10.0.x.x" value="{{ client_ip if client_ip else '' }}" required>
+                <small>> INJECT_WHITELIST_TARGET [IPv4/IPv6]</small>
             </div>
             <div class="form-group">
-                <label for="totpCode">动态验证码</label>
-                <input type="text" id="totpCode" name="totpCode" placeholder="请输入验证码" required maxlength="6" pattern="[0-9]{6}">
-                <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">请输入密钥</small>
+                <label for="totpCode">SECURITY_TOKEN</label>
+                <input type="text" id="totpCode" name="totpCode" placeholder="******" required maxlength="6" pattern="[0-9]{6}">
+                <small>> AUTH_REQUIRED (TOTP)</small>
             </div>
-            <button type="submit" id="submitBtn">
-                <span id="btnText">添加到白名单</span>
+            <button type="submit" id="submitBtn" data-text="> EXECUTE_OVERRIDE">
+                <span id="btnText">> EXECUTE_OVERRIDE</span>
             </button>
         </form>
         <div class="message" id="message"></div>
     </div>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/matrix.js') }}"></script>
 </body>
 </html>

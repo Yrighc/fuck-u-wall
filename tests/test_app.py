@@ -33,7 +33,7 @@ def test_manifest_json(client: FlaskClient) -> None:
     assert response.status_code == 200
     assert response.is_json
     data = response.get_json()
-    assert data["name"] == "IP 白名单管理"
+    assert data["name"] == "WALL_OVERRIDE_CONSOLE"
 
 
 def test_index_page_prefills_ip(client: FlaskClient) -> None:

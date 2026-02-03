@@ -9,15 +9,15 @@ document.getElementById('whitelistForm').addEventListener('submit', async (e) =>
 
     // 禁用按钮并显示加载状态
     submitBtn.disabled = true;
-    btnText.innerHTML = '<span class="loading"></span>处理中...';
+    btnText.innerHTML = '<span class="loading"></span>PROCESSING...';
 
     // 验证IP输入
     if (!ipInput || !ipInput.trim()) {
         message.className = 'message error';
-        message.textContent = '请输入IP地址';
+        message.textContent = 'ERROR: IP_ADDRESS_REQUIRED';
         message.style.display = 'block';
         submitBtn.disabled = false;
-        btnText.textContent = '添加到白名单';
+        btnText.textContent = '> EXECUTE';
         return;
     }
 
@@ -37,20 +37,21 @@ document.getElementById('whitelistForm').addEventListener('submit', async (e) =>
 
         const data = await response.json();
         message.className = 'message ' + (data.success ? 'success' : 'error');
-        message.textContent = data.message || (data.success ? '成功添加到白名单！' : '操作失败');
+        message.textContent = data.message || (data.success ? 'ACCESS_GRANTED' : 'ACCESS_DENIED');
         message.style.display = 'block';
 
         if (data.success) {
             document.getElementById('totpCode').value = '';
-            document.getElementById('ipInput').value = '';
+            // document.getElementById('ipInput').value = ''; // 既然自动获取IP，通常不需要清空，或者清空后重新填入当前IP？为了方便连续操作，保留或清空看习惯。这里保持原样清空吧。
+            document.getElementById('ipInput').value = ''; 
         }
     } catch (error) {
         message.className = 'message error';
-        message.textContent = '网络错误，请重试';
+        message.textContent = 'SYSTEM_ERROR: CONNECTION_LOST';
         message.style.display = 'block';
         console.error('添加失败:', error);
     } finally {
         submitBtn.disabled = false;
-        btnText.textContent = '添加到白名单';
+        btnText.textContent = '> EXECUTE_OVERRIDE';
     }
 });
