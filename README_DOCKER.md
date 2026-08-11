@@ -15,7 +15,26 @@
 
 ## 使用方式
 
-### 方式1：使用启动脚本（推荐，自动删除镜像并重新构建）
+### 方式1：使用 docker-compose 从 GHCR 拉取（推荐，直接使用 CI 发布的镜像）
+
+项目根目录已提供 `docker-compose.yml`，默认从 GitHub Container Registry 拉取最新镜像：
+
+```bash
+# 拉取 ghcr.io/yrighc/fuck-u-wall:latest 并启动
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+```
+
+> 镜像由 GitHub Actions 在每次 push 到 main 时自动构建发布，无需本地构建。
+> 从 GHCR 拉取需要镜像为公开（Package visibility = Public），或先执行
+> `echo "$TOKEN" | docker login ghcr.io -u 用户名 --password-stdin` 登录。
+
+### 方式2：使用启动脚本（本地构建）
 
 **Linux/Mac:**
 ```bash
@@ -33,7 +52,7 @@ start.bat
 3. 重新构建镜像
 4. 启动服务
 
-### 方式2：手动使用 docker-compose
+### 方式3：手动 docker-compose 本地构建
 
 1. **创建 `.env` 文件**（可选，但推荐）：
    ```bash
@@ -45,21 +64,16 @@ start.bat
    SUBDOMAIN=api.example.com,admin.example.com
    ```
 
-2. **删除旧镜像并重新构建启动**：
+2. **本地构建镜像**：
    ```bash
-   # 停止并删除容器
-   docker-compose down
-   
-   # 删除镜像（可选）
-   docker rmi wall-demo:0.0.1
-   
-   # 重新构建并启动
-   docker-compose up --build -d
+   docker build -t wall-demo:0.0.1 .
    ```
 
-3. **或者直接重新构建启动**（不删除镜像）：
+3. **将 docker-compose.yml 中的镜像指向本地构建**：把
+   `image: ghcr.io/yrighc/fuck-u-wall:latest` 改为 `image: wall-demo:0.0.1`，
+   并取消 `build` 块注释，然后启动：
    ```bash
-   docker-compose up --build -d
+   docker-compose up -d
    ```
 
 4. **查看日志**：
@@ -72,7 +86,7 @@ start.bat
    docker-compose down
    ```
 
-### 方式2：直接使用 Dockerfile
+### 方式4：直接使用 Dockerfile 构建
 
 1. **构建镜像**：
    ```bash
@@ -83,7 +97,7 @@ start.bat
    ```bash
    docker run -d \
      --name wall-demo \
-     -p 10002:8080 \
+     -p 10003:8080 \
      -e PORT=8080 \
      -e FLASK_SECRET_KEY=your-flask-secret-key \
      -e TOTP_SECRET=your-totp-secret \
@@ -97,7 +111,7 @@ start.bat
    ```bash
    docker run -d \
      --name wall-demo \
-     -p 10002:8080 \
+     -p 10003:8080 \
      --env-file .env \
      wall-demo:0.0.1
    ```
@@ -135,8 +149,8 @@ start.bat
    - 将密钥添加到环境变量中，重启容器
 
 4. **端口映射**：
-   - docker-compose.yml 中映射的是 `10002:8080`
-   - 访问地址：`http://localhost:10002`
+   - docker-compose.yml 中映射的是 `127.0.0.1:10003:8080`
+   - 访问地址：`http://localhost:10003`
    - 如需修改，编辑 `docker-compose.yml` 中的 `ports` 部分
 
 ## 验证环境变量是否生效

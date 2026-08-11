@@ -91,16 +91,16 @@ docker run -d \
   wall-demo
 ```
 
-### 3. 使用 Docker Compose（推荐）
+### 3. 使用 Docker Compose（推荐，从 GHCR 拉取镜像）
 
-创建 `docker-compose.yml`:
+项目根目录已提供 `docker-compose.yml`，默认从 GitHub Container Registry 拉取最新镜像：
 
 ```yaml
 version: '3.8'
 
 services:
   wall-demo:
-    build: .
+    image: ghcr.io/yrighc/fuck-u-wall:latest
     ports:
       - "8080:8080"
     environment:
@@ -123,6 +123,9 @@ export CLOUDFLARE_ZONE_ID=your-zone-id
 
 docker-compose up -d
 ```
+
+> 镜像由 GitHub Actions 在每次 push 到 main 时自动构建发布。
+> 本地构建模式见 `README_DOCKER.md` 方式 3/4。
 
 ### 4. 访问应用
 
