@@ -8,7 +8,6 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from wall.config import get_settings
 from wall.services.cloudflare_service import CloudflareService
-from wall.utils.ip_utils import get_public_ip
 
 # 禁用 SSL 警告（仅在必要时）
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
@@ -88,10 +87,25 @@ def set_security_headers(response: Response) -> Response:
     return response
 
 
+def _get_client_ip() -> str | None:
+    """获取来访客户端的真实公网 IP。
+
+    优先级：CF-Connecting-IP（Cloudflare 代理写入）> X-Forwarded-For 首个 > remote_addr。
+    预填仅作展示默认值，最终 IP 仍由服务端校验，TOTP 门槛不变。
+    """
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip.strip()
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.remote_addr
+
+
 @app.route("/")
 def index() -> str:
     """返回主页面"""
-    client_ip = get_public_ip()
+    client_ip = _get_client_ip()
     return render_template("index.html", client_ip=client_ip)
 
 
