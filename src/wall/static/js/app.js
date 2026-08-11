@@ -49,20 +49,52 @@
             action: widgetEl.dataset.action || 'whitelist',
         });
     };
+    // 暴露给提交逻辑：脚本可能在提交时才刚加载完，需要再次尝试渲染（幂等）
+    window._renderTurnstile = render;
 
     if (window.turnstile) {
         render();
         return;
     }
-    // api.js 尚未加载完成：轮询等待（最多 10s，避免无限轮询）
+    // api.js 尚未加载完成：轮询等待（上限 20s；提交时另有兜底等待）
     const poll = window.setInterval(() => {
         if (window.turnstile) {
             window.clearInterval(poll);
             render();
         }
     }, 200);
-    window.setTimeout(() => window.clearInterval(poll), 10000);
+    window.setTimeout(() => window.clearInterval(poll), 20000);
 })();
+
+// 等待 Turnstile 令牌就绪（覆盖脚本慢加载 / 挑战未完成），最多 TURNSTILE_WAIT_MS。
+// 返回令牌字符串；超时返回 ''（此时给明确错误，而不是发一个空令牌的请求）。
+const TURNSTILE_WAIT_MS = 12000;
+
+function waitForTurnstileToken() {
+    return new Promise((resolve) => {
+        const readToken = () => {
+            const w = window._turnstileWidgetId;
+            return w !== null && window.turnstile ? window.turnstile.getResponse(w) : '';
+        };
+        let token = readToken();
+        if (token) {
+            resolve(token);
+            return;
+        }
+        const deadline = Date.now() + TURNSTILE_WAIT_MS;
+        const poll = window.setInterval(() => {
+            if (typeof window._renderTurnstile === 'function') window._renderTurnstile();
+            token = readToken();
+            if (token) {
+                window.clearInterval(poll);
+                resolve(token);
+            } else if (Date.now() > deadline) {
+                window.clearInterval(poll);
+                resolve('');
+            }
+        }, 250);
+    });
+}
 
 // 添加到白名单
 const whitelistForm = document.getElementById('whitelistForm');
@@ -73,25 +105,12 @@ whitelistForm.addEventListener('submit', async (e) => {
     const submitBtn = document.getElementById('submitBtn');
     const btnText = document.getElementById('btnText');
     const message = document.getElementById('message');
-    const widgetId = window._turnstileWidgetId;
 
     // 禁用按钮并显示加载状态
     submitBtn.disabled = true;
     btnText.innerHTML = '<span class="loading"></span>PROCESSING...';
 
-    // Turnstile：未完成人机验证不允许提交
-    const turnstileToken =
-        widgetId !== null && window.turnstile ? window.turnstile.getResponse(widgetId) : '';
-    if (!turnstileToken) {
-        message.className = 'status-text message error';
-        message.textContent = 'ERROR: VERIFICATION_REQUIRED';
-        message.style.display = 'block';
-        submitBtn.disabled = false;
-        btnText.textContent = 'AUTHORIZE ACCESS';
-        return;
-    }
-
-    // 验证IP输入
+    // 验证IP输入（先于等待，避免无效输入还空等验证）
     if (!ipInput || !ipInput.trim()) {
         message.className = 'status-text message error';
         message.textContent = 'ERROR: IP_ADDRESS_REQUIRED';
@@ -100,6 +119,25 @@ whitelistForm.addEventListener('submit', async (e) => {
         btnText.textContent = 'AUTHORIZE ACCESS';
         return;
     }
+
+    // Turnstile：等待组件加载 / 挑战完成（最长 TURNSTILE_WAIT_MS），拿到令牌再提交
+    btnText.innerHTML = '<span class="loading"></span>AWAITING VERIFICATION...';
+    message.className = 'status-text message';
+    message.textContent = 'Security Verification Loading...';
+    message.style.display = 'block';
+    const turnstileToken = await waitForTurnstileToken();
+    if (!turnstileToken) {
+        message.className = 'status-text message error';
+        message.textContent = 'ERROR: VERIFICATION_TIMEOUT - 请完成页面上的验证或刷新重试';
+        message.style.display = 'block';
+        submitBtn.disabled = false;
+        btnText.textContent = 'AUTHORIZE ACCESS';
+        return;
+    }
+    btnText.innerHTML = '<span class="loading"></span>PROCESSING...';
+
+    // 提交时读取当时的 widgetId，供 finally 重置（等待期间可能才渲染出来）
+    const widgetId = window._turnstileWidgetId;
 
     let requestSent = false;
     try {
