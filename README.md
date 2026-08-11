@@ -5,7 +5,7 @@
 ## 功能特性
 
 - 🌐 自动检测当前 IP 地址
-- 🔐 密钥验证保护
+- 🔐 TOTP 动态验证码保护
 - ☁️ 自动添加到 Cloudflare 白名单
 - 🐳 Docker 容器化部署
 - 💾 占用资源小（Python + Flask + slim 镜像）
@@ -72,7 +72,7 @@ docker build -t wall-demo .
 docker run -d \
   -p 8080:8080 \
   -e PORT=8080 \
-  -e SECRET_KEY=your-secret-key-here \
+  -e FLASK_SECRET_KEY=your-secret-key-here \
   -e CLOUDFLARE_API_TOKEN=your-api-token \
   -e CLOUDFLARE_ZONE_ID=your-zone-id \
   -e SUBDOMAIN=api.example.com \
@@ -83,7 +83,7 @@ docker run -d \
 docker run -d \
   -p 8080:8080 \
   -e PORT=8080 \
-  -e SECRET_KEY=your-secret-key-here \
+  -e FLASK_SECRET_KEY=your-secret-key-here \
   -e CLOUDFLARE_API_TOKEN=your-api-token \
   -e CLOUDFLARE_ZONE_ID=your-zone-id \
   -e SUBDOMAIN=api.example.com,admin.example.com,dashboard.example.com \
@@ -105,7 +105,7 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-      - SECRET_KEY=your-secret-key-here
+      - FLASK_SECRET_KEY=your-secret-key-here
       - CLOUDFLARE_API_TOKEN=your-api-token
       - CLOUDFLARE_ZONE_ID=your-zone-id
       - SUBDOMAIN=api.example.com,admin.example.com
@@ -117,7 +117,7 @@ services:
 ```bash
 # 设置环境变量（或创建 .env 文件）
 export SUBDOMAIN=api.example.com,admin.example.com
-export SECRET_KEY=your-secret-key
+export FLASK_SECRET_KEY=your-secret-key
 export CLOUDFLARE_API_TOKEN=your-token
 export CLOUDFLARE_ZONE_ID=your-zone-id
 
@@ -132,36 +132,28 @@ docker-compose up -d
 
 | 变量名 | 说明 | 必需 | 默认值 |
 |--------|------|------|--------|
-| 变量名 | 说明 | 必需 | 默认值 |
-|--------|------|------|--------|
 | `PORT` | 服务端口 | 否 | 8080 |
-| `SECRET_KEY` | 自定义密钥 | 是 | - |
+| `FLASK_SECRET_KEY` | Flask Session 密钥 | 否 | 自动生成 |
+| `TOTP_SECRET` | TOTP 动态验证码密钥 | 否 | 自动生成（首次运行打印） |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token | 是 | - |
 | `CLOUDFLARE_ZONE_ID` | Cloudflare Zone ID | 是 | - |
-| `SUBDOMAIN` | 子域名（支持多个用逗号分隔，如 api.example.com,admin.example.com），必需 | 是 | - |
+| `SUBDOMAIN` | 子域名（支持多个用逗号分隔，如 api.example.com,admin.example.com） | 是 | - |
 
 ## 本地开发
 
 ```bash
 # 安装依赖
-pip install -r requirements.txt
+uv sync
 
-# 方式1：创建 .env 文件（推荐）
-# 复制 env.example 为 .env 并填写配置
-cp env.example .env
-# 编辑 .env 文件，填入你的配置
-
-# 方式2：使用环境变量
-export SECRET_KEY=your-secret-key
-export CLOUDFLARE_API_TOKEN=your-token
-export CLOUDFLARE_ZONE_ID=your-zone-id
-export SUBDOMAIN=api.example.com,admin.example.com
+# 创建配置文件（APP_ENV 默认为 dev，应用会自动读取 .env.dev）
+cp .env.example .env.dev
+# 编辑 .env.dev，填入你的配置
 
 # 运行
-python app.py
+uv run wall start
 ```
 
-> **提示**：使用 `.env` 文件时，应用会自动读取其中的环境变量，无需手动 export。
+> **提示**：也可以直接 export 环境变量启动，`.env.dev` 并非必需。
 
 ## 镜像大小
 
@@ -188,9 +180,9 @@ python app.py
 
 本应用已实现以下安全措施：
 
-1. **验证码保护**：
-   - 在密钥验证时需要使用数学验证码
-   - 验证码每次提交后自动刷新
+1. **TOTP 动态验证码**：
+   - 每次提交需输入 6 位 TOTP 动态验证码（兼容主流 Authenticator 应用）
+   - 验证码 30 秒过期，允许前后一个时间窗口
    - 防止自动化攻击和暴力破解
 
 2. **安全响应头**：
@@ -200,19 +192,19 @@ python app.py
    - Strict-Transport-Security
    - Content-Security-Policy
 
-3. **密钥验证**：
-   - 密钥验证结合验证码双重保护
-   - 密钥在传输时使用 HTTPS（建议在生产环境使用 HTTPS）
+3. **验证机制**：
+   - 服务端校验 TOTP 验证码 + IP 格式（IPv4/IPv6）
+   - 建议在生产环境使用 HTTPS，避免验证码明文传输
 
 ## 安全建议
 
 1. **使用 HTTPS**：
    - 生产环境必须使用 HTTPS（通过反向代理如 Nginx 或使用 Cloudflare）
-   - 不要在 HTTP 环境下使用，密钥会明文传输
+   - 不要在 HTTP 环境下使用，验证码会明文传输
 
-2. **强密钥**：
-   - 使用足够长且复杂的密钥（建议至少 32 个字符）
-   - 定期更换密钥
+2. **TOTP 密钥**：
+   - `TOTP_SECRET` 请妥善保管，泄露等于验证码失效
+   - 如怀疑泄露，更换密钥并重新绑定 Authenticator
 
 3. **网络隔离**：
    - 建议将应用部署在内网，通过 VPN 或 Cloudflare Tunnel 访问
@@ -225,7 +217,7 @@ python app.py
 ## 注意事项
 
 1. 确保 Cloudflare API Token 有足够的权限（需要 Firewall Rules 编辑权限）
-2. 密钥请妥善保管，不要泄露
+2. TOTP 密钥请妥善保管，不要泄露
 3. **每次点击"添加到白名单"时，会删除所有现有的防火墙规则，然后重新创建**
 4. **会同时创建白名单和黑名单规则**：
    - 白名单：当前公网IP允许访问
@@ -233,7 +225,7 @@ python app.py
 5. **必须设置 `SUBDOMAIN` 环境变量**，否则应用无法启动
 6. 支持多个子域名，用逗号分隔，如：`api.example.com,admin.example.com`
 7. 请确保所有子域名已经在 Cloudflare 中正确配置
-8. **生产环境必须使用 HTTPS**，否则密钥会明文传输
+8. **生产环境必须使用 HTTPS**，否则验证码会明文传输
 
 ## 许可证
 
