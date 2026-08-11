@@ -13,6 +13,9 @@
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token | **是** | - |
 | `CLOUDFLARE_ZONE_ID` | Cloudflare Zone ID | **是** | - |
 | `SUBDOMAIN` | 子域名（多个用逗号分隔） | **是** | - |
+| `MAX_FAILED_ATTEMPTS` | TOTP 爆破防护：单 IP 最大失败次数 | 否 | 5 |
+| `LOCKOUT_MINUTES` | TOTP 爆破防护：锁定时长（分钟） | 否 | 15 |
+| `HOST` | 监听地址（容器内保持 0.0.0.0） | 否 | 0.0.0.0 |
 | `TURNSTILE_SITEKEY` | Turnstile 站点 key（前端） | **是** | - |
 | `TURNSTILE_SECRET` | Turnstile 后端密钥（仅服务端可见） | **是** | - |
 | `TURNSTILE_HOSTNAMES` | 允许的前端域名白名单（逗号分隔） | **是** | - |
