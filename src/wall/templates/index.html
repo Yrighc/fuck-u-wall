@@ -5,33 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#050505">
-    <title>ROOT@WALL:~#</title>
+    <meta name="theme-color" content="#0a0a0a">
+    <title>WALL — IP WHITELIST</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <canvas id="matrixCanvas"></canvas>
+
+    <div class="page-marker marker-left" aria-hidden="true">SECURITY_PROTOCOL_v4.02</div>
+    <div class="page-marker marker-right" aria-hidden="true">CLOUDFLARE_NETWORK_ADMIN</div>
+
     <div class="container">
-        <h1>SYSTEM_OVERRIDE_PANEL</h1>
-        <form id="whitelistForm">
-            <div class="form-group">
-                <label for="ipInput">TARGET_IP_ADDRESS</label>
-                <input type="text" id="ipInput" name="ipInput" placeholder="ex: 192.168.x.x, 10.0.x.x" value="{{ client_ip if client_ip else '' }}" required>
-                <small>> INJECT_WHITELIST_TARGET [IPv4/IPv6]</small>
+        <div class="header">
+            <h1>IP White-list</h1>
+            <p>Admin Utility / Firewall Access</p>
+        </div>
+
+        <form id="whitelistForm" class="content">
+            <div class="field-group">
+                <div class="label-row">
+                    <label for="ipInput">Target IPv4/IPv6 Address</label>
+                    <label class="label-dim" aria-hidden="true">Required</label>
+                </div>
+                <div class="input-wrapper">
+                    <input type="text" id="ipInput" name="ipInput" placeholder="0.0.0.0"
+                           value="{{ client_ip if client_ip else '' }}"
+                           autocomplete="off" spellcheck="false" required>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="totpCode">SECURITY_TOKEN</label>
-                <input type="text" id="totpCode" name="totpCode" placeholder="******" required maxlength="6" pattern="[0-9]{6}">
-                <small>> AUTH_REQUIRED (TOTP)</small>
+
+            <div class="field-group">
+                <div class="label-row">
+                    <label for="totp-1">6-Digit Verification Code</label>
+                    <label class="label-dim" aria-hidden="true">TOTP</label>
+                </div>
+                <div class="totp-container">
+                    <div class="input-wrapper"><input type="text" inputmode="numeric" maxlength="1" class="totp-input" id="totp-1" placeholder="0" autocomplete="one-time-code"></div>
+                    <div class="input-wrapper"><input type="text" inputmode="numeric" maxlength="1" class="totp-input" placeholder="0"></div>
+                    <div class="input-wrapper"><input type="text" inputmode="numeric" maxlength="1" class="totp-input" placeholder="0"></div>
+                    <div class="input-wrapper"><input type="text" inputmode="numeric" maxlength="1" class="totp-input" placeholder="0"></div>
+                    <div class="input-wrapper"><input type="text" inputmode="numeric" maxlength="1" class="totp-input" placeholder="0"></div>
+                    <div class="input-wrapper"><input type="text" inputmode="numeric" maxlength="1" class="totp-input" placeholder="0"></div>
+                </div>
+                <!-- 6 格输入同步到此隐藏字段，app.js 读取它（保持原有 JS 契约） -->
+                <input type="hidden" id="totpCode" name="totpCode">
             </div>
-            <button type="submit" id="submitBtn" data-text="> EXECUTE_OVERRIDE">
-                <span id="btnText">> EXECUTE_OVERRIDE</span>
+
+            <button type="submit" class="submit-btn" id="submitBtn" data-text="AUTHORIZE ACCESS">
+                <span id="btnText">AUTHORIZE ACCESS</span>
             </button>
+
+            <div class="status-area">
+                <div class="status-dot" aria-hidden="true"></div>
+                <div class="status-text message" id="message">System Awaiting Input...</div>
+            </div>
         </form>
-        <div class="message" id="message"></div>
+
+        <div class="footer">
+            <div class="footer-item">
+                <div class="footer-icon" aria-hidden="true"></div>
+                <span>Encrypted Session</span>
+            </div>
+            <div class="footer-item">
+                <div class="footer-icon footer-icon-diamond" aria-hidden="true"></div>
+                <span>Global Edge</span>
+            </div>
+            <div class="footer-item">
+                <span id="statusClock">00:00:00</span>
+            </div>
+        </div>
     </div>
+
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/matrix.js') }}"></script>
+
 </body>
 </html>

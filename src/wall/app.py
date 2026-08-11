@@ -104,8 +104,8 @@ def manifest() -> Response:
         "description": "Cloudflare Firewall Override Tool",
         "start_url": "/",
         "display": "standalone",
-        "background_color": "#667eea",
-        "theme_color": "#667eea",
+        "background_color": "#0a0a0a",
+        "theme_color": "#0a0a0a",
         "orientation": "portrait",
         "icons": [
             {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
@@ -120,11 +120,11 @@ def icon_192() -> Response:
     """生成 192x192 图标"""
     from PIL import Image, ImageDraw
 
-    img = Image.new("RGB", (192, 192), color=(102, 126, 234))
+    img = Image.new("RGB", (192, 192), color=(10, 10, 10))
     draw = ImageDraw.Draw(img)
     # 绘制简单的图标
-    draw.ellipse([40, 40, 152, 152], fill=(255, 255, 255))
-    draw.text((70, 80), "IP", fill=(102, 126, 234))
+    draw.ellipse([40, 40, 152, 152], fill=(180, 168, 229))
+    draw.text((70, 80), "IP", fill=(10, 10, 10))
 
     img_io = io.BytesIO()
     img.save(img_io, "PNG")
@@ -137,11 +137,11 @@ def icon_512() -> Response:
     """生成 512x512 图标"""
     from PIL import Image, ImageDraw
 
-    img = Image.new("RGB", (512, 512), color=(102, 126, 234))
+    img = Image.new("RGB", (512, 512), color=(10, 10, 10))
     draw = ImageDraw.Draw(img)
     # 绘制简单的图标
-    draw.ellipse([100, 100, 412, 412], fill=(255, 255, 255))
-    draw.text((200, 220), "IP", fill=(102, 126, 234))
+    draw.ellipse([100, 100, 412, 412], fill=(180, 168, 229))
+    draw.text((200, 220), "IP", fill=(10, 10, 10))
 
     img_io = io.BytesIO()
     img.save(img_io, "PNG")

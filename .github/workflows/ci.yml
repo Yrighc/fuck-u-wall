@@ -52,7 +52,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: "test-token"
           CLOUDFLARE_ZONE_ID: "test-zone-id"
           SUBDOMAIN: "test.example.com"
-          TOTP_SECRET: "test-totp-secret"
         run: uv run pytest
 
   # ------------------------------------------------------------------
