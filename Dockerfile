@@ -1,36 +1,45 @@
-# 使用 Python 3.12 (与 pyproject.toml 保持一致)
-FROM python:3.12-slim
+# ============================================================
+# 多阶段构建:builder 负责安装依赖,runner 只保留 .venv
+# 避免 uv 二进制 (~44MB) 和 uv 下载缓存 (~43MB) 进入最终镜像
+# ============================================================
 
-# 1. 安装 uv (从官方镜像复制二进制文件)
+# ---- 构建阶段 ----
+FROM python:3.12-slim AS builder
+
+# 安装 uv (从官方镜像复制二进制文件)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# 设置工作目录
 WORKDIR /app
 
-# 环境变量设置
 ENV PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
-    # 告诉 uv 将环境安装到系统或指定位置，这里我们让 uv 管理 .venv，然后加到 PATH
     UV_LINK_MODE=copy
 
-# 2. 复制依赖定义文件
+# 1. 复制依赖定义文件
 COPY pyproject.toml uv.lock ./
 
-# 3. 安装依赖 (不包含项目本身，利用缓存)
+# 2. 安装依赖 (不包含项目本身,利用缓存)
 # --frozen: 严格按照 uv.lock 安装
 # --no-dev: 仅安装生产依赖
-# --no-install-project: 这一步只装依赖库，不装本项目代码
+# --no-install-project: 这一步只装依赖库,不装本项目代码
 RUN uv sync --frozen --no-dev --no-install-project
 
-# 4. 复制项目源码
+# 3. 复制项目源码,安装项目本身
 COPY src ./src
 COPY README.md ./
+# --no-editable: 实体安装项目到 site-packages,runner 阶段无需保留 src 目录
+RUN uv sync --frozen --no-dev --no-editable
 
-# 5. 安装项目本身
-RUN uv sync --frozen --no-dev
+# ---- 运行阶段 ----
+FROM python:3.12-slim
 
-# 6. 将虚拟环境加入 PATH
-ENV PATH="/app/.venv/bin:$PATH"
+WORKDIR /app
+
+# 4. 从构建阶段只拷贝虚拟环境 (项目已安装到 site-packages,wall 命令可用)
+COPY --from=builder /app/.venv /app/.venv
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
 
 # 暴露端口
 EXPOSE 8080
