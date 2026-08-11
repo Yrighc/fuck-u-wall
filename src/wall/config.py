@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     # 监听地址：Docker/公网部署保持 0.0.0.0；本机开发建议 127.0.0.1
     # （macOS 绑定 0.0.0.0 会触发“本地网络”权限检查，导致启动卡十几秒）
     host: str = "0.0.0.0"
-    totp_secret: str
+    # 留空/缺失时在 init_globals 中自动生成（与 .env.example 文档一致）
+    totp_secret: str = ""
 
     # Cloudflare Api Token (需要有编辑防火墙规则的权限)
     cloudflare_api_token: str

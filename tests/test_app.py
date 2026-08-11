@@ -320,3 +320,17 @@ def test_verify_turnstile_rejects_oversized_token(monkeypatch: pytest.MonkeyPatc
     assert wall_app._verify_turnstile("", "1.2.3.4") is False
 
 
+def test_settings_totp_secret_defaults_to_empty() -> None:
+    """totp_secret 必须有默认值（空串），缺失时在 init_globals 自动生成
+
+    回归测试：首页渲染调用 get_settings()，而 CI 测试环境不设 TOTP_SECRET；
+    若该字段为必填，Settings() 会抛 ValidationError 并 SystemExit(1)，
+    导致整个测试进程退出。
+    """
+    from wall.config import Settings
+
+    field = Settings.model_fields["totp_secret"]
+    assert field.default == ""
+    assert not field.is_required()
+
+
