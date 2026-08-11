@@ -12,13 +12,10 @@
 </head>
 <body>
 
-    <div class="page-marker marker-left" aria-hidden="true">SECURITY_PROTOCOL_v4.02</div>
-    <div class="page-marker marker-right" aria-hidden="true">CLOUDFLARE_NETWORK_ADMIN</div>
-
     <div class="container">
         <div class="header">
             <h1>IP White-list</h1>
-            <p>Admin Utility / Firewall Access</p>
+            <p>Access Control</p>
         </div>
 
         <form id="whitelistForm" class="content">
@@ -36,8 +33,7 @@
 
             <div class="field-group">
                 <div class="label-row">
-                    <label for="totp-1">6-Digit Verification Code</label>
-                    <label class="label-dim" aria-hidden="true">TOTP</label>
+                    <label for="totp-1">Verification Code</label>
                 </div>
                 <div class="totp-container">
                     <div class="input-wrapper"><input type="text" inputmode="numeric" maxlength="1" class="totp-input" id="totp-1" placeholder="0" autocomplete="one-time-code"></div>
@@ -54,6 +50,13 @@
             <button type="submit" class="submit-btn" id="submitBtn" data-text="AUTHORIZE ACCESS">
                 <span id="btnText">AUTHORIZE ACCESS</span>
             </button>
+
+            <div class="turnstile-area">
+                <!-- Turnstile 人机验证：显式渲染，app.js 保留 widgetId 以便重置 -->
+                <div id="turnstile-widget"
+                     data-sitekey="{{ turnstile_sitekey }}"
+                     data-action="whitelist"></div>
+            </div>
 
             <div class="status-area">
                 <div class="status-dot" aria-hidden="true"></div>
@@ -76,6 +79,7 @@
         </div>
     </div>
 
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 
 </body>

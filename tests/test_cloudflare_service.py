@@ -1,6 +1,9 @@
 """CloudflareService（Rulesets API）单元测试：全部 mock，不触网"""
+import logging
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from wall.services.cloudflare_service import CloudflareService
 
@@ -98,7 +101,7 @@ def test_missing_ruleset_treated_as_empty() -> None:
         assert len(put_rules) == 2
 
 
-def test_read_failure_returns_error() -> None:
+def test_read_failure_returns_error(caplog: pytest.LogCaptureFixture) -> None:
     service = _make_service()
     with patch("wall.services.cloudflare_service.requests") as mock_req:
         mock_req.get.return_value = _mock_response(
@@ -106,14 +109,17 @@ def test_read_failure_returns_error() -> None:
             status_code=403,
         )
 
-        success, message = service.add_ips_to_whitelist(IPS)
+        with caplog.at_level(logging.ERROR, logger="wall.services.cloudflare_service"):
+            success, message = service.add_ips_to_whitelist(IPS)
 
+        # 对外统一返回通用错误码，真实细节只进日志
         assert not success
-        assert "Authentication error" in message
+        assert message == "OVERRIDE_FAILED"
+        assert "Authentication error" in caplog.text
         mock_req.put.assert_not_called()
 
 
-def test_update_failure_returns_error() -> None:
+def test_update_failure_returns_error(caplog: pytest.LogCaptureFixture) -> None:
     service = _make_service()
     with patch("wall.services.cloudflare_service.requests") as mock_req:
         mock_req.get.return_value = _mock_response(_get_payload([]))
@@ -121,7 +127,9 @@ def test_update_failure_returns_error() -> None:
             {"success": False, "errors": [{"message": "invalid expression"}]}
         )
 
-        success, message = service.add_ips_to_whitelist(IPS)
+        with caplog.at_level(logging.ERROR, logger="wall.services.cloudflare_service"):
+            success, message = service.add_ips_to_whitelist(IPS)
 
         assert not success
-        assert "invalid expression" in message
+        assert message == "OVERRIDE_FAILED"
+        assert "invalid expression" in caplog.text
