@@ -2,12 +2,14 @@ version: '3.8'
 
 services:
   wall-demo:
-    image: wall-demo:0.0.1
-    build:
-      context: .
-      dockerfile: Dockerfile
-      # 每次构建时不使用缓存，强制重新构建（如需启用，取消注释）
-      # no_cache: true
+    # 从 GitHub Container Registry (GHCR) 拉取最新镜像
+    # 镜像需先通过 CI 发布 (ghcr.io/yrighc/fuck-u-wall:latest)
+    image: ghcr.io/yrighc/fuck-u-wall:latest
+    # 本地构建模式（开发用）：先 `docker build -t wall-demo:0.0.1 .`，
+    # 再把上面 image 改为 wall-demo:0.0.1 并取消下面的 build 注释
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     ports:
       - "127.0.0.1:10003:8080"
     environment:
