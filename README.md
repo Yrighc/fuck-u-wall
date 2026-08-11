@@ -99,37 +99,45 @@ docker run -d \
 version: '3.8'
 
 services:
-  wall-demo:
+  fuck-u-wall:
     image: ghcr.io/yrighc/fuck-u-wall:latest
     ports:
-      - "8080:8080"
+      - "127.0.0.1:10003:8080"
     environment:
-      - PORT=8080
-      - FLASK_SECRET_KEY=your-secret-key-here
-      - CLOUDFLARE_API_TOKEN=your-api-token
-      - CLOUDFLARE_ZONE_ID=your-zone-id
-      - SUBDOMAIN=api.example.com,admin.example.com
+      - PORT=${PORT:-8080}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-}
+      - TOTP_SECRET=${TOTP_SECRET:-}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID}
+      - SUBDOMAIN=${SUBDOMAIN}
     restart: unless-stopped
 ```
 
-运行：
+变量通过 `${VAR}` 从环境变量或 `.env` 文件（与 `docker-compose.yml` 同目录）读取：
 
 ```bash
-# 设置环境变量（或创建 .env 文件）
-export SUBDOMAIN=api.example.com,admin.example.com
-export FLASK_SECRET_KEY=your-secret-key
-export CLOUDFLARE_API_TOKEN=your-token
-export CLOUDFLARE_ZONE_ID=your-zone-id
+# 方式 A：创建 .env 文件（推荐，与 docker-compose.yml 同目录）
+cat > .env <<'EOF'
+SUBDOMAIN=api.example.com,admin.example.com
+FLASK_SECRET_KEY=your-secret-key
+TOTP_SECRET=your-totp-secret
+CLOUDFLARE_API_TOKEN=your-token
+CLOUDFLARE_ZONE_ID=your-zone-id
+EOF
+
+# 方式 B：或直接 export
+# export SUBDOMAIN=api.example.com,admin.example.com
 
 docker-compose up -d
 ```
 
+> 优先级：shell 环境变量 > `.env` 文件 > yaml 默认值。
 > 镜像由 GitHub Actions 在每次 push 到 main 时自动构建发布。
 > 本地构建模式见 `README_DOCKER.md` 方式 3/4。
 
 ### 4. 访问应用
 
-打开浏览器访问 `http://localhost:8080`
+打开浏览器访问 `http://localhost:10003`
 
 ## 环境变量说明
 
