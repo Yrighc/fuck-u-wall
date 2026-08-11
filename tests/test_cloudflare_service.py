@@ -1,4 +1,5 @@
 """CloudflareService（Rulesets API）单元测试：全部 mock，不触网"""
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from wall.services.cloudflare_service import CloudflareService
@@ -7,7 +8,7 @@ ZONE = "zone123"
 SUBDOMAINS = ["api.example.com", "admin.example.com"]
 IPS = ["203.0.113.10", "203.0.113.11"]
 
-USER_RULE = {
+USER_RULE: dict[str, Any] = {
     "id": "user-rule-1",
     "description": "Unused filter",
     "action": "block",
@@ -15,7 +16,7 @@ USER_RULE = {
     "expression": 'http.host eq "example.com"',
 }
 
-OLD_MANAGED_RULE = {
+OLD_MANAGED_RULE: dict[str, Any] = {
     "id": "old-managed-1",
     "description": "wall-auto: block all except 1.1.1.1 for api.example.com",
     "action": "block",
@@ -27,14 +28,14 @@ def _make_service() -> CloudflareService:
     return CloudflareService(api_token="t", zone_id=ZONE, subdomains=SUBDOMAINS)
 
 
-def _mock_response(payload: dict, status_code: int = 200) -> MagicMock:
+def _mock_response(payload: dict[str, Any], status_code: int = 200) -> MagicMock:
     resp = MagicMock()
     resp.status_code = status_code
     resp.json.return_value = payload
     return resp
 
 
-def _get_payload(rules: list) -> dict:
+def _get_payload(rules: list[dict[str, Any]]) -> dict[str, Any]:
     return {"success": True, "result": {"id": "rs1", "rules": rules}}
 
 
