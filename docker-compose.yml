@@ -19,6 +19,9 @@ services:
       - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
       - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID}
       - SUBDOMAIN=${SUBDOMAIN}
+      - TURNSTILE_SITEKEY=${TURNSTILE_SITEKEY:-}
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET:-}
+      - TURNSTILE_HOSTNAMES=${TURNSTILE_HOSTNAMES:-}
     restart: unless-stopped
     # 如果需要使用 .env 文件，取消下面的注释
     # env_file:

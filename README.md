@@ -123,6 +123,9 @@ FLASK_SECRET_KEY=your-secret-key
 TOTP_SECRET=your-totp-secret
 CLOUDFLARE_API_TOKEN=your-token
 CLOUDFLARE_ZONE_ID=your-zone-id
+TURNSTILE_SITEKEY=0x4AAAAAAEM5askdJyE9tkFz
+TURNSTILE_SECRET=your-turnstile-secret
+TURNSTILE_HOSTNAMES=localhost,127.0.0.1
 EOF
 
 # 方式 B：或直接 export
@@ -144,11 +147,17 @@ docker-compose up -d
 | 变量名 | 说明 | 必需 | 默认值 |
 |--------|------|------|--------|
 | `PORT` | 服务端口 | 否 | 8080 |
+| `HOST` | 监听地址（本机开发建议 `127.0.0.1`；Docker/公网用 `0.0.0.0`） | 否 | 0.0.0.0 |
 | `FLASK_SECRET_KEY` | Flask Session 密钥 | 否 | 自动生成 |
 | `TOTP_SECRET` | TOTP 动态验证码密钥 | 否 | 自动生成（首次运行打印） |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token | 是 | - |
 | `CLOUDFLARE_ZONE_ID` | Cloudflare Zone ID | 是 | - |
 | `SUBDOMAIN` | 子域名（支持多个用逗号分隔，如 api.example.com,admin.example.com） | 是 | - |
+| `MAX_FAILED_ATTEMPTS` | TOTP 爆破防护：单 IP 允许的最大失败次数，达到后锁定 | 否 | 5 |
+| `LOCKOUT_MINUTES` | TOTP 爆破防护：锁定时长（分钟） | 否 | 15 |
+| `TURNSTILE_SITEKEY` | Turnstile 人机验证站点 key（前端） | **是** | - |
+| `TURNSTILE_SECRET` | Turnstile 后端密钥（仅服务端可见） | **是** | - |
+| `TURNSTILE_HOSTNAMES` | 允许的前端域名白名单（逗号分隔，与 widget 注册域名一致） | **是** | - |
 
 ## 本地开发
 
@@ -197,15 +206,31 @@ uv run wall start
    - 验证码 30 秒过期，允许前后一个时间窗口
    - 防止自动化攻击和暴力破解
 
-2. **安全响应头**：
+2. **失败限流与锁定**（防爆破）：
+   - 单个客户端 IP 连续失败 `MAX_FAILED_ATTEMPTS` 次（默认 5）后锁定 `LOCKOUT_MINUTES` 分钟（默认 15），锁定期内即使验证码正确也返回 429
+   - 验证成功后失败计数自动清零
+   - 限流身份取客户端 IP（CF-Connecting-IP / X-Forwarded-For / remote_addr）
+
+3. **对外错误信息收敛**：
+   - 鉴权失败统一返回 `ACCESS_DENIED`，不区分验证码缺失 / 格式错误 / 校验失败
+   - 服务端异常与 Cloudflare API 错误细节只写日志，不向客户端透传
+   - 无鉴权的 `/api/get-target-domain` 接口已下线，不再暴露受保护子域名
+
+4. **Turnstile 人机验证**：
+   - 提交前必须先通过 Turnstile 挑战，未通过直接 403，不消耗 TOTP 校验次数
+   - 服务端通过 siteverify 二次校验：要求 `success=true`、action 匹配（`whitelist`）、hostname 在白名单（`TURNSTILE_HOSTNAMES`）内
+   - 令牌单次有效，每次提交后前端自动重置挑战
+   - 未配置 `TURNSTILE_SITEKEY` / `TURNSTILE_SECRET` / `TURNSTILE_HOSTNAMES` 时应用拒绝启动（fail-closed）
+
+5. **安全响应头**：
    - X-Content-Type-Options: nosniff
    - X-Frame-Options: DENY
    - X-XSS-Protection: 1; mode=block
    - Strict-Transport-Security
-   - Content-Security-Policy
+   - Content-Security-Policy（已放行 Turnstile 所需的 challenges.cloudflare.com）
 
-3. **验证机制**：
-   - 服务端校验 TOTP 验证码 + IP 格式（IPv4/IPv6）
+6. **验证机制**：
+   - 服务端校验 Turnstile 令牌 + TOTP 验证码 + IP 格式（IPv4/IPv6）
    - 建议在生产环境使用 HTTPS，避免验证码明文传输
 
 ## 安全建议
@@ -221,6 +246,7 @@ uv run wall start
 3. **网络隔离**：
    - 建议将应用部署在内网，通过 VPN 或 Cloudflare Tunnel 访问
    - 不要将应用直接暴露在公网
+   - **必须将应用置于 Cloudflare 代理或可信反向代理之后**：限流依赖请求头中的客户端 IP，直接暴露公网时攻击者可伪造请求头绕过限流
 
 4. **监控和告警**：
    - 监控失败尝试日志

@@ -7,11 +7,15 @@
 | 变量名 | 说明 | 必需 | 默认值 |
 |--------|------|------|--------|
 | `PORT` | 服务端口 | 否 | 8080 |
+| `HOST` | 监听地址（容器内保持 0.0.0.0） | 否 | 0.0.0.0 |
 | `FLASK_SECRET_KEY` | Flask Session 密钥 | 否 | 自动生成 |
 | `TOTP_SECRET` | TOTP 动态验证码密钥 | 否 | 自动生成（首次运行会打印） |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token | **是** | - |
 | `CLOUDFLARE_ZONE_ID` | Cloudflare Zone ID | **是** | - |
 | `SUBDOMAIN` | 子域名（多个用逗号分隔） | **是** | - |
+| `TURNSTILE_SITEKEY` | Turnstile 站点 key（前端） | **是** | - |
+| `TURNSTILE_SECRET` | Turnstile 后端密钥（仅服务端可见） | **是** | - |
+| `TURNSTILE_HOSTNAMES` | 允许的前端域名白名单（逗号分隔） | **是** | - |
 
 ## 使用方式
 

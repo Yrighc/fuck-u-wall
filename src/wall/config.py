@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # totp 密钥 (用于生成动态验证码)
     # 可以使用 pyotp.random_base32() 生成，或使用页面上的二维码/密钥
     port: int = 8080  # 应用监听端口，默认 8080
+    # 监听地址：Docker/公网部署保持 0.0.0.0；本机开发建议 127.0.0.1
+    # （macOS 绑定 0.0.0.0 会触发“本地网络”权限检查，导致启动卡十几秒）
+    host: str = "0.0.0.0"
     totp_secret: str
 
     # Cloudflare Api Token (需要有编辑防火墙规则的权限)
@@ -32,6 +35,17 @@ class Settings(BaseSettings):
 
     # 子域名 （必填，支持多个用逗号分割，如 api.example.com,admin.example.com)
     subdomain: str
+
+    # TOTP 爆破防护：单个客户端 IP 在窗口内允许的最大失败次数，达到后锁定
+    max_failed_attempts: int = 5
+    # 锁定时长（分钟）
+    lockout_minutes: int = 15
+
+    # Turnstile 人机验证（必填）：前端站点 key 与后端密钥
+    turnstile_sitekey: str = ""
+    turnstile_secret: str = ""
+    # 允许的前端域名白名单（逗号分隔，对应 siteverify 返回的 hostname 字段）
+    turnstile_hostnames: str = ""
 
     # 4. 计算属性 (衍生配置)
     @computed_field  # type: ignore[prop-decorator]

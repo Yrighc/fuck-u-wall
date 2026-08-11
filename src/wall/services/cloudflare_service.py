@@ -3,6 +3,8 @@ from typing import Any
 
 import requests
 
+logger = logging.getLogger("wall.services.cloudflare_service")
+
 """
 CloudflareService 类：用于管理 Cloudflare 安全规则（WAF Custom Rules）的服务类。
 
@@ -10,6 +12,9 @@ CloudflareService 类：用于管理 Cloudflare 安全规则（WAF Custom Rules�
 - 读取 zone 的完整 ruleset，仅替换本工具管理的规则（description 以 wall-auto 开头）
 - 用户手动创建的安全规则原样保留，且相对顺序不变
 - 全量 PUT 更新，单次请求原子生效
+
+安全约定：失败时返回给调用方的 message 统一为通用文案 "OVERRIDE_FAILED"，
+真实错误细节只写日志，避免经接口泄露给客户端。
 """
 
 
@@ -48,9 +53,11 @@ class CloudflareService:
             return self._update_ruleset(new_rules + preserved, ip_list)
 
         except requests.exceptions.RequestException as e:
-            return False, f"API_REQUEST_FAILED: {str(e)}"
+            logger.error("Cloudflare API 请求失败: %s", e)
+            return False, "OVERRIDE_FAILED"
         except Exception as e:
-            return False, f"PROCESS_FAILED: {str(e)}"
+            logger.error("白名单规则处理失败: %s", e)
+            return False, "OVERRIDE_FAILED"
 
     def _is_managed(self, rule: dict[str, Any]) -> bool:
         """判断规则是否由本工具创建（通过 description 前缀识别）"""
@@ -120,10 +127,14 @@ class CloudflareService:
         return bool(data.get("success", False))
 
     def _get_error_msg(self, response: requests.Response, default_msg: str) -> str:
+        """记录 Cloudflare 真实错误细节，返回通用错误码（不泄露内部信息）。"""
         try:
             result = response.json()
             errors = result.get("errors", [])
-            return str(errors[0].get("message", default_msg)) if errors else default_msg
+            detail = str(errors[0].get("message", default_msg)) if errors else default_msg
         except Exception as e:
-            logging.error(f"解析 Cloudflare 错误响应失败: {str(e)}")
-            return default_msg
+            detail = f"{default_msg} (解析错误响应失败: {e})"
+        logger.error(
+            "Cloudflare API 错误: status=%s detail=%s", response.status_code, detail
+        )
+        return "OVERRIDE_FAILED"

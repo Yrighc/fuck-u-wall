@@ -35,18 +35,61 @@
     });
 })();
 
+// Turnstile：显式渲染并保留 widgetId，提交后调用 turnstile.reset(widgetId) 供重试
+// 注意：api.js 是 async 加载，可能在 app.js 执行时尚未就绪，必须等待/轮询
+(function initTurnstile() {
+    const widgetEl = document.getElementById('turnstile-widget');
+    window._turnstileWidgetId = null;
+    if (!widgetEl || !widgetEl.dataset.sitekey) return;
+
+    const render = () => {
+        if (window._turnstileWidgetId !== null || !window.turnstile) return;
+        window._turnstileWidgetId = window.turnstile.render(widgetEl, {
+            sitekey: widgetEl.dataset.sitekey,
+            action: widgetEl.dataset.action || 'whitelist',
+        });
+    };
+
+    if (window.turnstile) {
+        render();
+        return;
+    }
+    // api.js 尚未加载完成：轮询等待（最多 10s，避免无限轮询）
+    const poll = window.setInterval(() => {
+        if (window.turnstile) {
+            window.clearInterval(poll);
+            render();
+        }
+    }, 200);
+    window.setTimeout(() => window.clearInterval(poll), 10000);
+})();
+
 // 添加到白名单
-document.getElementById('whitelistForm').addEventListener('submit', async (e) => {
+const whitelistForm = document.getElementById('whitelistForm');
+whitelistForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const totpCode = document.getElementById('totpCode').value;
     const ipInput = document.getElementById('ipInput').value.trim();
     const submitBtn = document.getElementById('submitBtn');
     const btnText = document.getElementById('btnText');
     const message = document.getElementById('message');
+    const widgetId = window._turnstileWidgetId;
 
     // 禁用按钮并显示加载状态
     submitBtn.disabled = true;
     btnText.innerHTML = '<span class="loading"></span>PROCESSING...';
+
+    // Turnstile：未完成人机验证不允许提交
+    const turnstileToken =
+        widgetId !== null && window.turnstile ? window.turnstile.getResponse(widgetId) : '';
+    if (!turnstileToken) {
+        message.className = 'status-text message error';
+        message.textContent = 'ERROR: VERIFICATION_REQUIRED';
+        message.style.display = 'block';
+        submitBtn.disabled = false;
+        btnText.textContent = 'AUTHORIZE ACCESS';
+        return;
+    }
 
     // 验证IP输入
     if (!ipInput || !ipInput.trim()) {
@@ -58,12 +101,15 @@ document.getElementById('whitelistForm').addEventListener('submit', async (e) =>
         return;
     }
 
+    let requestSent = false;
     try {
         const requestBody = {
             totp_code: totpCode,
-            ips: ipInput.trim()
+            ips: ipInput.trim(),
+            cf_turnstile_response: turnstileToken
         };
 
+        requestSent = true;
         const response = await fetch('/api/add-to-whitelist', {
             method: 'POST',
             headers: {
@@ -80,7 +126,6 @@ document.getElementById('whitelistForm').addEventListener('submit', async (e) =>
         if (data.success) {
             document.getElementById('totpCode').value = '';
             document.querySelectorAll('.totp-input').forEach((b) => { b.value = ''; });
-            // document.getElementById('ipInput').value = ''; // 既然自动获取IP，通常不需要清空，或者清空后重新填入当前IP？为了方便连续操作，保留或清空看习惯。这里保持原样清空吧。
             document.getElementById('ipInput').value = '';
         }
     } catch (error) {
@@ -89,6 +134,11 @@ document.getElementById('whitelistForm').addEventListener('submit', async (e) =>
         message.style.display = 'block';
         console.error('添加失败:', error);
     } finally {
+        // Turnstile 令牌单次有效：只要发出过请求就重置 widget（含网络异常路径），
+        // 避免下次提交复用已被消耗的令牌
+        if (requestSent && widgetId !== null && window.turnstile) {
+            window.turnstile.reset(widgetId);
+        }
         submitBtn.disabled = false;
         btnText.textContent = 'AUTHORIZE ACCESS';
     }
